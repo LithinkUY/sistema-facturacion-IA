@@ -3,6 +3,7 @@
 	$multiplier = 1;
 
 	$action = !empty($action) ? $action : '';
+	$is_unified = !empty($is_unified) ? $is_unified : false;
 @endphp
 
 @foreach($sub_units as $key => $value)
@@ -13,6 +14,180 @@
 	@endif
 @endforeach
 
+@if($is_unified)
+{{-- ============ UNIFIED QUOTATION ROW ============ --}}
+@php
+	$hide_tax = 'hide';
+	if(session()->get('business.enable_inline_tax') == 1){
+		$hide_tax = '';
+	}
+	$tax_id = $product->tax_id;
+	$item_tax = !empty($product->item_tax) ? $product->item_tax : 0;
+	$unit_price_inc_tax = $product->sell_price_inc_tax;
+	if($hide_tax == 'hide'){
+		$tax_id = null;
+		$unit_price_inc_tax = $product->default_sell_price;
+	}
+	if(!empty($so_line) && $action !== 'edit') {
+		$tax_id = $so_line->tax_id;
+		$item_tax = $so_line->item_tax;
+		$unit_price_inc_tax = $so_line->unit_price_inc_tax;
+	}
+	$discount_type = !empty($product->line_discount_type) ? $product->line_discount_type : 'fixed';
+	$discount_amount = !empty($product->line_discount_amount) ? $product->line_discount_amount : 0;
+	if(!empty($discount)) {
+		$discount_type = $discount->discount_type;
+		$discount_amount = $discount->discount_amount;
+	}
+	if(!empty($so_line) && $action !== 'edit') {
+		$discount_type = $so_line->line_discount_type;
+		$discount_amount = $so_line->line_discount_amount;
+	}
+	$sell_line_note = '';
+	if(!empty($product->sell_line_note)){ $sell_line_note = $product->sell_line_note; }
+	if(!empty($so_line)){ $sell_line_note = $so_line->sell_line_note; }
+
+	$pos_unit_price = !empty($product->unit_price_before_discount) ? $product->unit_price_before_discount : $product->default_sell_price;
+	if(!empty($so_line) && $action !== 'edit') {
+		$pos_unit_price = $so_line->unit_price_before_discount;
+	}
+	if($discount_type == 'fixed') {
+		$discount_amount_calc = $discount_amount * $multiplier;
+	} else {
+		$discount_amount_calc = $discount_amount;
+	}
+
+	// Compute unified columns
+	$precio_regular = $pos_unit_price;
+	$desc_percent = ($discount_type == 'percentage') ? $discount_amount : 0;
+	if($discount_type == 'fixed' && $precio_regular > 0) {
+		$desc_percent = ($discount_amount_calc / $precio_regular) * 100;
+	}
+	$precio_oferta = $precio_regular - ($precio_regular * $desc_percent / 100);
+	$qty = !empty($product->quantity_ordered) ? $product->quantity_ordered : 1;
+	// Total = precio_oferta * qty. Si no hay descuento, precio_oferta == precio_regular
+	$total_linea = $precio_oferta * $qty;
+	$ahorro_linea = ($precio_regular * $qty) - $total_linea;
+
+	$warranty_id = !empty($action) && $action == 'edit' && !empty($product->warranties->first()) ? $product->warranties->first()->id : $product->warranty_id;
+@endphp
+
+<tr class="product_row unified_row" data-row_index="{{$row_count}}" @if(!empty($so_line)) data-so_id="{{$so_line->transaction_id}}" @endif>
+	@if(!empty($is_serial_no))
+		<td class="serial_no"></td>
+	@endif
+	{{-- PRODUCT NAME --}}
+	<td>
+		@if(!empty($so_line))
+			<input type="hidden" name="products[{{$row_count}}][so_line_id]" value="{{$so_line->id}}">
+		@endif
+		@php
+			$product_name = e($product->product_name) . '<br/>' . $product->sub_sku;
+			if(!empty($product->brand)){ $product_name .= ' ' . $product->brand; }
+		@endphp
+		{!! $product_name !!}
+		<input type="hidden" class="enable_sr_no" value="{{$product->enable_sr_no}}">
+		<input type="hidden" class="product_type" name="products[{{$row_count}}][product_type]" value="{{$product->product_type}}">
+
+		@if(!empty($product->transaction_sell_lines_id))
+			<input type="hidden" name="products[{{$row_count}}][transaction_sell_lines_id]" class="form-control" value="{{$product->transaction_sell_lines_id}}">
+		@endif
+		<input type="hidden" name="products[{{$row_count}}][product_id]" class="form-control product_id" value="{{$product->product_id}}">
+		<input type="hidden" value="{{$product->variation_id}}" name="products[{{$row_count}}][variation_id]" class="row_variation_id">
+		<input type="hidden" value="{{$product->enable_stock}}" name="products[{{$row_count}}][enable_stock]">
+		<input type="hidden" name="products[{{$row_count}}][product_unit_id]" value="{{$product->unit_id}}">
+		<input type="hidden" class="base_unit_multiplier" name="products[{{$row_count}}][base_unit_multiplier]" value="{{$multiplier}}">
+		<input type="hidden" class="hidden_base_unit_sell_price" value="{{$product->default_sell_price / $multiplier}}">
+
+		@if(!empty($discount))
+			{!! Form::hidden("products[$row_count][discount_id]", $discount->id); !!}
+		@endif
+
+		{{-- Hidden fields needed by POS JS for saving --}}
+		<input type="hidden" name="products[{{$row_count}}][unit_price]" class="form-control pos_unit_price input_number mousetrap" value="{{@num_format($pos_unit_price)}}">
+		<input type="hidden" name="products[{{$row_count}}][line_discount_amount]" class="form-control input_number row_discount_amount unified_hidden_discount" value="{{@num_format($desc_percent)}}">
+		<input type="hidden" name="products[{{$row_count}}][line_discount_type]" value="percentage">
+		{!! Form::hidden("products[$row_count][item_tax]", @num_format($item_tax), ['class' => 'item_tax']) !!}
+		{!! Form::hidden("products[$row_count][tax_id]", $tax_id, ['class' => 'tax_id']) !!}
+		<input type="hidden" name="products[{{$row_count}}][unit_price_inc_tax]" class="form-control pos_unit_price_inc_tax input_number" value="{{@num_format($precio_oferta)}}">
+		<input type="hidden" class="form-control pos_line_total" value="{{@num_format($total_linea)}}">
+		<span class="display_currency pos_line_total_text hide" data-currency_symbol="true">{{$total_linea}}</span>
+
+		{{-- Data attributes for unified JS calculations --}}
+		<input type="hidden" class="unified_precio_regular_val" value="{{$precio_regular}}">
+
+		@if(!empty($is_direct_sell))
+			<br>
+			<textarea class="form-control" name="products[{{$row_count}}][sell_line_note]" rows="2">{{$sell_line_note}}</textarea>
+		@endif
+
+		@php
+			$max_quantity = $product->qty_available;
+			$formatted_max_quantity = $product->formatted_qty_available;
+		@endphp
+	</td>
+
+	{{-- QUANTITY --}}
+	<td>
+		@if(empty($product->quantity_ordered))
+			@php $product->quantity_ordered = 1; @endphp
+		@endif
+		@php
+			$allow_decimal = true;
+			if($product->unit_allow_decimal != 1) { $allow_decimal = false; }
+		@endphp
+		<div class="input-group input-number" style="width:120px">
+			<span class="input-group-btn"><button type="button" class="btn btn-default btn-flat quantity-down"><i class="fa fa-minus text-danger"></i></button></span>
+			<input type="text" data-min="1" style="width: auto"
+				class="form-control pos_quantity input_number mousetrap input_quantity unified_qty" 
+				value="{{@format_quantity($product->quantity_ordered)}}" name="products[{{$row_count}}][quantity]" 
+				data-allow-overselling="@if(empty($pos_settings['allow_overselling'])){{'false'}}@else{{'true'}}@endif" 
+				@if($allow_decimal) data-decimal=1 @else data-decimal=0 data-rule-abs_digit="true" data-msg-abs_digit="@lang('lang_v1.decimal_value_not_allowed')" @endif
+				data-rule-required="true" data-msg-required="@lang('validation.custom-messages.this_field_is_required')" 
+				@if($product->enable_stock && empty($pos_settings['allow_overselling']))
+					data-rule-max-value="{{$max_quantity}}" data-qty_available="{{$product->qty_available}}" data-msg-max-value="@lang('validation.custom-messages.quantity_not_available', ['qty'=> $formatted_max_quantity, 'unit' => $product->unit])" 
+				@endif 
+			>
+			<span class="input-group-btn"><button type="button" class="btn btn-default btn-flat quantity-up"><i class="fa fa-plus text-success"></i></button></span>
+		</div>
+		<small>{{$product->unit}}</small>
+	</td>
+
+	{{-- PRECIO REGULAR (read only display) --}}
+	<td class="text-right">
+		<span class="unified_precio_regular_display" style="font-size: 13px;">{{ @num_format($precio_regular) }}</span>
+	</td>
+
+	{{-- PRECIO OFERTA (editable) --}}
+	<td>
+		<input type="text" class="form-control input_number unified_precio_oferta_input" 
+			value="{{@num_format($precio_oferta)}}" 
+			style="width: 100px; color: #27ae60; font-weight: bold; text-align: right;"
+			placeholder="0">
+	</td>
+
+	{{-- DESC % (auto-calculated) --}}
+	<td class="text-center">
+		<span class="unified_desc_percent" style="font-size: 13px;">{{ $desc_percent > 0 ? rtrim(rtrim(number_format($desc_percent, 4), '0'), '.') : '0' }}%</span>
+	</td>
+
+	{{-- TOTAL (auto-calculated) --}}
+	<td class="text-right">
+		<span class="unified_total_display" style="font-weight: bold; font-size: 13px;">{{ @num_format($total_linea) }}</span>
+	</td>
+
+	{{-- AHORRO (auto-calculated) --}}
+	<td class="text-right">
+		<span class="unified_ahorro_display" style="color: #e74c3c; font-size: 13px;">{{ $ahorro_linea > 0 ? @num_format($ahorro_linea) : '-' }}</span>
+	</td>
+
+	{{-- REMOVE --}}
+	<td class="text-center v-center">
+		<i class="fa fa-times text-danger pos_remove_row cursor-pointer" aria-hidden="true"></i>
+	</td>
+</tr>
+@else
+{{-- ============ NORMAL PRODUCT ROW ============ --}}
 <tr class="product_row" data-row_index="{{$row_count}}" @if(!empty($so_line)) data-so_id="{{$so_line->transaction_id}}" @endif>
 	@if(!empty($is_serial_no))
 		<td class="serial_no" ></td>
@@ -361,9 +536,10 @@
 				<small class="text-muted">@lang('lang_v1.prev_unit_price'): @format_currency($last_sell_line->unit_price_before_discount)</small>
 			@endif
 		</td>
-		<td @if(!$edit_discount) class="hide" @endif>
-			{!! Form::text("products[$row_count][line_discount_amount]", @num_format($discount_amount), ['class' => 'form-control input_number row_discount_amount']); !!}<br>
-			{!! Form::select("products[$row_count][line_discount_type]", ['fixed' => __('lang_v1.fixed'), 'percentage' => __('lang_v1.percentage')], $discount_type , ['class' => 'form-control row_discount_type']); !!}
+		<td>
+			{!! Form::text("products[$row_count][line_discount_amount]", @num_format($discount_amount), ['class' => 'form-control input_number row_discount_amount', 'placeholder' => '0', 'data-decimal' => '1']); !!}
+			{!! Form::hidden("products[$row_count][line_discount_type]", 'percentage'); !!}
+			<small class="text-muted">%</small>
 			@if(!empty($discount))
 				<p class="help-block">{!! __('lang_v1.applied_discount_text', ['discount_name' => $discount->name, 'starts_at' => $discount->formated_starts_at, 'ends_at' => $discount->formated_ends_at]) !!}</p>
 			@endif
@@ -396,6 +572,11 @@
 				</div>
 			</td>
 		@endif
+		<td>
+			{!! Form::text("products[$row_count][line_discount_amount]", @num_format($discount_amount), ['class' => 'form-control input_number row_discount_amount', 'placeholder' => '0', 'data-decimal' => '1']); !!}
+			{!! Form::hidden("products[$row_count][line_discount_type]", 'percentage'); !!}
+			<small class="text-muted">%</small>
+		</td>
 	@endif
 	<td class="{{$hide_tax}}">
 		<input type="text" style="width: auto" name="products[{{$row_count}}][unit_price_inc_tax]" class="form-control pos_unit_price_inc_tax input_number" value="{{@num_format($unit_price_inc_tax)}}" @if(!$edit_price) readonly @endif @if(!empty($pos_settings['enable_msp'])) data-rule-min-value="{{$unit_price_inc_tax}}" data-msg-min-value="{{__('lang_v1.minimum_selling_price_error_msg', ['price' => @num_format($unit_price_inc_tax)])}}" @endif>
@@ -417,3 +598,4 @@
 		<i class="fa fa-times text-danger pos_remove_row cursor-pointer" aria-hidden="true"></i>
 	</td>
 </tr>
+@endif

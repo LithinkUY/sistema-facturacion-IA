@@ -205,6 +205,9 @@
 					<th class="text-center col-md-2 {{$hide_tax}}">
 						@lang('sale.price_inc_tax')
 					</th>
+					<th class="text-center col-md-1">
+						@lang('receipt.discount') %
+					</th>
 					<th class="text-center col-md-2">
 						@lang('sale.subtotal')
 					</th>

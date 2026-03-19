@@ -613,39 +613,11 @@ $(document).ready(function() {
                             },
                         },
                     },
-                    tax_number: {
-                        remote: {
-                            url: '/contacts/check-tax-number',
-                            type: 'post',
-                            data: {
-                                contact_id: function() {
-                                    return $('#hidden_id').val();
-                                },
-                                tax_number: function() {
-                                    return $('#tax_number').val();
-                                },
-                            },
-                            dataFilter: function(response) {
-                                try {
-                                    var taxResult = JSON.parse(response);
-                                    if (taxResult && taxResult.is_tax_number_exists === true) {
-                                        return '"' + (taxResult.msg || LANG.tax_number_already_exists) + '"';
-                                    }
-                                    return 'true';
-                                } catch (e) {
-                                    return 'true';
-                                }
-                            }
-                        }
-                    }
                 },
                 messages: {
                     contact_id: {
                         remote: LANG.contact_id_already_exists,
                     },
-                    tax_number: {
-                        remote: LANG.tax_number_already_exists,
-                    }
                 },
                 submitHandler: function(form) {
                     e.preventDefault();

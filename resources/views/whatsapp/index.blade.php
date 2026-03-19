@@ -43,10 +43,16 @@
 
     /* Input */
     .wa-input-area { padding: 10px 16px; background: #f0f2f5; display: flex; gap: 8px; align-items: center; }
-    .wa-input-area input { flex: 1; border: none; border-radius: 20px; padding: 10px 16px; font-size: 0.9em; outline: none; }
+    .wa-input-area input[type="text"] { flex: 1; border: none; border-radius: 20px; padding: 10px 16px; font-size: 0.9em; outline: none; }
     .wa-send-btn { width: 42px; height: 42px; border-radius: 50%; background: #075e54; color: #fff; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.2s; }
     .wa-send-btn:hover { background: #128c7e; }
     .wa-send-btn:disabled { opacity: 0.5; }
+    .wa-attach-btn { width: 42px; height: 42px; border-radius: 50%; background: #fff; color: #54656f; border: 1px solid #d1d7db; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.1em; flex-shrink: 0; transition: 0.2s; }
+    .wa-attach-btn:hover { background: #e0e0e0; }
+    .wa-attach-btn:disabled { opacity: 0.5; }
+    .wa-msg .file-msg { display: flex; align-items: center; gap: 8px; padding: 4px 0; }
+    .wa-msg .file-msg .file-icon { font-size: 1.6em; color: #128c7e; }
+    .wa-msg .file-msg .file-name { font-size: 0.85em; color: #111b21; font-weight: 500; }
 
     /* Empty state */
     .wa-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; color: #667781; }
@@ -107,6 +113,9 @@
             <div class="wa-sidebar-header">
                 <h4><i class="fab fa-whatsapp"></i> WhatsApp</h4>
                 <div>
+                    <button class="btn btn-sm" id="btn_new_chat_header" title="Nuevo chat" style="background:rgba(255,255,255,0.2);color:#fff;border:none;border-radius:50%;width:34px;height:34px;padding:0;margin-right:6px;">
+                        <i class="fas fa-plus"></i>
+                    </button>
                     <a href="{{ url('/whatsapp/settings') }}" class="text-white" title="Configuración">
                         <i class="fas fa-cog"></i>
                     </a>
@@ -182,6 +191,11 @@
             </div>
 
             <div class="wa-input-area" id="input_area" style="display: none;">
+                <button type="button" class="wa-attach-btn" id="btn_attach" title="Adjuntar documento o imagen">
+                    <i class="fas fa-paperclip"></i>
+                </button>
+                <input type="file" id="file_input" style="display:none;"
+                       accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx,.xls,.xlsx,.txt">
                 <input type="text" id="wa_input" placeholder="Escribe un mensaje..." autocomplete="off">
                 <button class="wa-send-btn" id="btn_send" {{ !$isConfigured ? 'disabled' : '' }}>
                     <i class="fas fa-paper-plane"></i>
@@ -201,8 +215,12 @@
             </div>
             <div class="modal-body">
                 <div class="form-group">
+                    <label>Nombre del contacto (opcional):</label>
+                    <input type="text" class="form-control" id="new_contact_name" placeholder="Juan Pérez">
+                </div>
+                <div class="form-group">
                     <label>Número de teléfono:</label>
-                    <input type="text" class="form-control" id="new_phone" placeholder="+598 99 123 456">
+                    <input type="text" class="form-control" id="new_phone" placeholder="59899123456">
                     <small class="text-muted">Formato: código país + número (ej: 59899123456)</small>
                 </div>
                 <div class="form-group">
@@ -339,6 +357,8 @@ $(document).ready(function() {
                     } else {
                         toastr.error(res.error || 'Error al enviar');
                     }
+                } else if (res.warning) {
+                    toastr.warning(res.warning, 'Aviso', {timeOut: 8000});
                 }
             },
             error: function() {
@@ -365,16 +385,120 @@ $(document).ready(function() {
         if (e.which === 13) $('#btn_send').click();
     });
 
-    // Nuevo mensaje
-    $('#btn_new_msg').click(function() { $('#modal_new_msg').modal('show'); });
+    // Nuevo mensaje - desde botón del empty state o del header
+    $('#btn_new_msg, #btn_new_chat_header').click(function() { $('#modal_new_msg').modal('show'); });
     $('#btn_send_new').click(function() {
         var phone = $('#new_phone').val().replace(/[^0-9]/g, '');
         var text = $('#new_message').val();
-        if (!phone || !text.trim()) { toastr.warning('Completa todos los campos'); return; }
-        sendMsg(phone, text, null);
-        toastr.success('Mensaje enviado');
+        var contactName = $('#new_contact_name').val().trim() || phone;
+        if (!phone || !text.trim()) { toastr.warning('Completa teléfono y mensaje'); return; }
+        sendMsg(phone, text, contactName);
+
+        // Agregar conversación a la lista si no existe
+        if (!$('.wa-conv-item[data-phone="' + phone + '"]').length) {
+            var initial = contactName.charAt(0).toUpperCase();
+            var newConv = '<div class="wa-conv-item" data-phone="' + phone + '" data-name="' + $('<div>').text(contactName).html() + '">' +
+                '<div class="wa-conv-avatar">' + initial + '</div>' +
+                '<div class="wa-conv-info"><div class="wa-conv-name">' + $('<div>').text(contactName).html() + '</div>' +
+                '<div class="wa-conv-last">' + $('<div>').text(text).html().substring(0, 40) + '</div></div>' +
+                '<div class="wa-conv-meta"><div class="wa-conv-time">Ahora</div></div></div>';
+            $('#conv_list').prepend(newConv);
+        }
+
+        // Abrir el chat directamente
+        currentPhone = phone;
+        currentName = contactName;
+        $('.wa-conv-item').removeClass('active');
+        $('.wa-conv-item[data-phone="' + phone + '"]').addClass('active');
+        loadChat(phone, contactName);
+
+        // Preview del mensaje enviado
+        appendMessage({
+            direction: 'outgoing', message: text,
+            time: new Date().toLocaleTimeString('es-UY', {hour:'2-digit',minute:'2-digit'}),
+            status: 'sent', is_ai: false
+        });
+        scrollToBottom();
+
+        toastr.success('Mensaje enviado a +' + phone);
         $('#modal_new_msg').modal('hide');
-        $('#new_phone').val(''); $('#new_message').val('');
+        $('#new_phone').val(''); $('#new_message').val(''); $('#new_contact_name').val('');
+    });
+
+    // ====== ADJUNTAR ARCHIVOS ======
+    $('#btn_attach').click(function() {
+        if ({{ $isConfigured ? 'false' : 'true' }}) {
+            toastr.warning('WhatsApp no está configurado');
+            return;
+        }
+        if (!currentPhone) {
+            toastr.warning('Selecciona una conversación primero');
+            return;
+        }
+        $('#file_input').click();
+    });
+
+    $('#file_input').change(function() {
+        var file = this.files[0];
+        if (!file) return;
+
+        if (file.size > 20 * 1024 * 1024) {
+            toastr.error('El archivo supera los 20 MB permitidos');
+            $(this).val('');
+            return;
+        }
+
+        var caption = prompt('Agregar descripción (opcional):', '') || '';
+        var formData = new FormData();
+        formData.append('_token', csrfToken);
+        formData.append('phone', currentPhone);
+        formData.append('file', file);
+        formData.append('caption', caption);
+        formData.append('contact_name', currentName || currentPhone);
+
+        // Preview inmediato en el chat
+        var time = new Date().toLocaleTimeString('es-UY', {hour:'2-digit', minute:'2-digit'});
+        var isImage = file.type.startsWith('image/');
+        var previewHtml = '<div class="wa-msg outgoing">';
+        if (isImage) {
+            var objUrl = URL.createObjectURL(file);
+            previewHtml += '<div class="file-msg"><img src="' + objUrl + '" style="max-width:200px;max-height:160px;border-radius:6px;"></div>';
+        } else {
+            previewHtml += '<div class="file-msg"><span class="file-icon"><i class="fas fa-file-alt"></i></span>'
+                         + '<span class="file-name">' + $('<div>').text(file.name).html() + '</span></div>';
+        }
+        if (caption) previewHtml += '<div style="font-size:0.85em;margin-top:2px;">' + $('<div>').text(caption).html() + '</div>';
+        previewHtml += '<div class="wa-msg-meta"><span class="wa-msg-time">' + time + '</span> <span class="wa-msg-status" style="color:#999;">✓</span></div></div>';
+        $('#chat_messages').append(previewHtml);
+        scrollToBottom();
+
+        // Deshabilitar mientras sube
+        $('#btn_attach').prop('disabled', true);
+        $('#btn_attach i').removeClass('fa-paperclip').addClass('fa-spinner fa-spin');
+
+        $.ajax({
+            url: '{{ url("/whatsapp/send-document") }}',
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(res) {
+                if (res.success) {
+                    toastr.success('Archivo enviado: ' + res.filename);
+                } else {
+                    toastr.error(res.error || 'Error al enviar el archivo');
+                }
+            },
+            error: function(xhr) {
+                var err = (xhr.responseJSON && xhr.responseJSON.error) ? xhr.responseJSON.error : 'Error al enviar el archivo';
+                toastr.error(err);
+            },
+            complete: function() {
+                $('#btn_attach').prop('disabled', false);
+                $('#btn_attach i').removeClass('fa-spinner fa-spin').addClass('fa-paperclip');
+                $('#file_input').val('');
+            }
+        });
     });
 
     // Buscar conversación

@@ -1,8 +1,13 @@
 @extends('layouts.app')
 
 @php
+	$is_unified = $is_unified ?? false;
 	if (!empty($status) && $status == 'quotation') {
-		$title = __('lang_v1.add_quotation');
+		if ($is_unified) {
+			$title = 'Cotización Unificada';
+		} else {
+			$title = __('lang_v1.add_quotation');
+		}
 	} else if (!empty($status) && $status == 'draft') {
 		$title = __('lang_v1.add_draft');
 	} else {
@@ -181,7 +186,8 @@
 
 		              {!! Form::select('pay_term_type', 
 		              	['months' => __('lang_v1.months'), 
-		              		'days' => __('lang_v1.days')], 
+		              		'days' => __('lang_v1.days'),
+		              		'a_coordinar' => 'A coordinar'], 
 		              		$walk_in_customer['pay_term_type'], 
 		              	['class' => 'form-control width-60 pull-left','placeholder' => __('messages.please_select'), 'required' => $is_pay_term_required]); !!}
 		            </div>
@@ -213,6 +219,9 @@
 				</div>
 				@if(!empty($status))
 					<input type="hidden" name="status" id="status" value="{{$status}}">
+					@if($is_unified)
+						<input type="hidden" name="is_unified" id="is_unified" value="1">
+					@endif
 
 					@if(in_array($status, ['draft', 'quotation']))
 						<input type="hidden" id="disable_qty_alert">
@@ -368,6 +377,17 @@
 					<table class="table table-condensed table-bordered table-striped table-responsive" id="pos_table">
 						<thead>
 							<tr>
+								@if($is_unified)
+									<th class="text-center" style="width: 30px">#</th>
+									<th class="text-center">Producto</th>
+									<th class="text-center" style="width: 130px">Cantidad</th>
+									<th class="text-center" style="width: 100px">Precio Regular</th>
+									<th class="text-center" style="width: 110px">Precio Oferta</th>
+									<th class="text-center" style="width: 70px">Desc %</th>
+									<th class="text-center" style="width: 100px">Total</th>
+									<th class="text-center" style="width: 100px">Ahorro</th>
+									<th class="text-center" style="width: 30px"><i class="fas fa-times" aria-hidden="true"></i></th>
+								@else
 								<th class="text-center">#</th>
 								<th class="text-center">	
 									@lang('sale.product')
@@ -383,7 +403,7 @@
 								<th class="@if(!auth()->user()->can('edit_product_price_from_sale_screen')) hide @endif">
 									@lang('sale.unit_price')
 								</th>
-								<th class="@if(!auth()->user()->can('edit_product_discount_from_sale_screen')) hide @endif">
+								<th>
 									@lang('receipt.discount')
 								</th>
 								<th class="text-center {{$hide_tax}}">
@@ -399,6 +419,7 @@
 									@lang('sale.subtotal')
 								</th>
 								<th class="text-center"><i class="fas fa-times" aria-hidden="true"></i></th>
+								@endif
 							</tr>
 						</thead>
 						<tbody></tbody>
@@ -441,6 +462,7 @@
 				</div>
 			@endcomponent
 			@component('components.widget', ['class' => 'box-solid'])
+			@if(!$is_unified)
 				<div class="col-md-4  @if($sale_type == 'sales_order') hide @endif">
 			        <div class="form-group">
 			            {!! Form::label('discount_type', __('sale.discount_type') . ':*' ) !!}
@@ -523,12 +545,26 @@
 			    <div class="col-md-4 col-md-offset-4  @if($sale_type == 'sales_order') hide @endif">
 			    	<b>@lang( 'sale.order_tax' ):</b>(+) 
 					<span class="display_currency" id="order_tax">0</span>
-			    </div>				
+			    </div>
+			    @endif
 				
 			    <div class="col-md-12">
 			    	<div class="form-group">
 						{!! Form::label('sell_note',__('sale.sell_note')) !!}
 						{!! Form::textarea('sale_note', null, ['class' => 'form-control', 'rows' => 3]); !!}
+					</div>
+			    </div>
+			    {{-- Terms & Conditions for quotations --}}
+			    <div class="col-md-8 terms_conditions_div @if($sale_type != 'quotation') hide @endif">
+			    	<div class="form-group">
+						{!! Form::label('staff_note', 'Términos y Condiciones:') !!}
+						{!! Form::textarea('staff_note', null, ['class' => 'form-control', 'rows' => 3, 'placeholder' => 'Ingrese los términos y condiciones del presupuesto...']); !!}
+					</div>
+			    </div>
+			    <div class="col-md-4 terms_conditions_div @if($sale_type != 'quotation') hide @endif">
+			    	<div class="form-group">
+						{!! Form::label('custom_field_4', 'URL Términos y Condiciones:') !!}
+						{!! Form::text('custom_field_4', null, ['class' => 'form-control', 'placeholder' => 'https://ejemplo.com/terminos']); !!}
 					</div>
 			    </div>
 				<input type="hidden" name="is_direct_sale" value="1">
@@ -1100,6 +1136,72 @@
 					e.preventDefault();
 					$('#btn_save_manual_product').click();
 				}
+			});
+
+			// Toggle pay_term_number visibility when 'a_coordinar' is selected
+			$('select[name="pay_term_type"]').on('change', function() {
+				if ($(this).val() == 'a_coordinar') {
+					$('input[name="pay_term_number"]').val('0').closest('.width-40').hide();
+				} else {
+					$('input[name="pay_term_number"]').closest('.width-40').show();
+				}
+			}).trigger('change');
+
+			// ============================================================
+			// UNIFIED QUOTATION: Auto-calculation logic
+			// ============================================================
+			function recalcUnifiedRow(row) {
+				var regular = parseFloat(row.find('.unified_precio_regular_val').val()) || 0;
+				var ofertaInput = row.find('.unified_precio_oferta_input');
+				var oferta = __read_number(ofertaInput);
+				var qty = __read_number(row.find('input.pos_quantity'));
+
+				// Si el precio oferta es 0 o vacío, usar precio regular
+				if (!oferta || oferta <= 0) {
+					oferta = regular;
+				}
+				// Si el precio oferta es mayor que el regular, limitar al regular
+				if (oferta > regular) {
+					oferta = regular;
+					__write_number(ofertaInput, oferta);
+				}
+
+				// Calcular descuento %
+				var descPct = 0;
+				if (regular > 0) {
+					descPct = ((regular - oferta) / regular) * 100;
+				}
+
+				// Calcular total y ahorro
+				var total = oferta * qty;
+				var ahorro = (regular * qty) - total;
+
+				// Actualizar display spans
+				row.find('.unified_desc_percent').text(descPct > 0 ? parseFloat(descPct.toFixed(4)).toString() + '%' : '0%');
+				row.find('.unified_total_display').text(__number_f(total));
+				row.find('.unified_ahorro_display').text(ahorro > 0 ? __number_f(ahorro) : '-');
+				if (ahorro > 0) {
+					row.find('.unified_ahorro_display').css('color', '#e74c3c');
+				}
+
+				// Sincronizar campos ocultos para que el guardado funcione
+				__write_number(row.find('.unified_hidden_discount'), descPct, false, 6);
+				__write_number(row.find('.pos_unit_price_inc_tax'), oferta);
+				__write_number(row.find('.pos_line_total'), total);
+				row.find('span.pos_line_total_text').text(__currency_trans_from_en(total, true));
+			}
+
+			// Evento: cambio en Precio Oferta
+			$(document).on('change keyup', '.unified_precio_oferta_input', function() {
+				var row = $(this).closest('tr.unified_row');
+				recalcUnifiedRow(row);
+				pos_total_row();
+			});
+
+			// Evento: cambio en Cantidad de fila unificada
+			$(document).on('change', 'tr.unified_row input.pos_quantity', function() {
+				var row = $(this).closest('tr.unified_row');
+				recalcUnifiedRow(row);
 			});
 
     	});

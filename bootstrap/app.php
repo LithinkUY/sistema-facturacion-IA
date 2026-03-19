@@ -1,8 +1,5 @@
 <?php
 
-// Suppress PHP 8.4 deprecation warnings for Laravel 9.x compatibility
-error_reporting(E_ALL & ~E_DEPRECATED);
-
 /*
 |--------------------------------------------------------------------------
 | Register Composer Auto Loader

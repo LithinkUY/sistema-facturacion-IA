@@ -66,6 +66,7 @@ class OrderPedidoController extends Controller
                     $html .= '<ul class="dropdown-menu dropdown-menu-right">';
                     $html .= '<li><a href="' . route('order-pedidos.show', $row->id) . '"><i class="fas fa-eye"></i> Ver Detalle</a></li>';
                     $html .= '<li><a href="' . route('order-pedidos.edit', $row->id) . '"><i class="fas fa-edit"></i> Editar</a></li>';
+                    $html .= '<li><a href="' . route('order-pedidos.pdf', $row->id) . '" target="_blank"><i class="fas fa-file-pdf text-danger"></i> Descargar PDF</a></li>';
                     if ($row->status === 'draft' || $row->status === 'pending') {
                         $html .= '<li><a href="#" class="delete-order" data-href="' . route('order-pedidos.destroy', $row->id) . '"><i class="fas fa-trash text-danger"></i> Eliminar</a></li>';
                     }
@@ -548,6 +549,71 @@ class OrderPedidoController extends Controller
         }
 
         return response()->json(['results' => $results]);
+    }
+
+    /**
+     * Descargar PDF de la orden de pedido
+     */
+    public function downloadPdf($id)
+    {
+        try {
+            $business_id = request()->session()->get('user.business_id');
+
+            $order = OrderPedido::where('business_id', $business_id)
+                ->with(['contact', 'location', 'createdBy', 'approvedBy', 'lines.product', 'lines.variation', 'business'])
+                ->findOrFail($id);
+
+            // Obtener datos del negocio
+            $business = $order->business;
+
+            // Calcular totales
+            $subtotal = $order->lines->sum(function ($item) {
+                return $item->quantity * $item->unit_price;
+            });
+            $tax = $order->tax_amount ?? 0;
+            $discount = $order->discount_amount ?? 0;
+            $total = $subtotal + $tax - $discount;
+
+            // Renderizar la vista HTML para el PDF
+            $html = view('order_pedidos.pdf', compact('order', 'business', 'subtotal', 'tax', 'discount', 'total'))->render();
+
+            $tempDir = public_path('uploads/temp');
+            if (!is_dir($tempDir)) {
+                mkdir($tempDir, 0755, true);
+            }
+
+            $mpdf = new \Mpdf\Mpdf([
+                'tempDir' => $tempDir,
+                'mode' => 'utf-8',
+                'autoScriptToLang' => true,
+                'autoLangToFont' => true,
+                'margin_top' => 10,
+                'margin_bottom' => 15,
+                'margin_left' => 12,
+                'margin_right' => 12,
+                'format' => 'A4',
+            ]);
+
+            $mpdf->useSubstitutions = true;
+            $mpdf->SetTitle('Orden-' . $order->order_number);
+            $mpdf->SetAuthor($business->name ?? 'Empresa');
+
+            $mpdf->WriteHTML($html);
+
+            $filename = 'Orden-' . $order->order_number . '.pdf';
+
+            return response($mpdf->Output($filename, 'S'), 200, [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Error generando PDF de orden: ' . $e->getMessage());
+            return redirect()->back()->with('status', [
+                'success' => 0,
+                'msg' => 'Error al generar PDF: ' . $e->getMessage()
+            ]);
+        }
     }
 
     private function getStatusText($status)

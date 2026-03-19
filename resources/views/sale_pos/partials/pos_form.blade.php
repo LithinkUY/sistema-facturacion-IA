@@ -47,6 +47,7 @@
 					
 
 					<button type="button" class="btn btn-default bg-white btn-flat pos_add_quick_product" data-href="{{action([\App\Http\Controllers\ProductController::class, 'quickAdd'])}}" data-container=".quick_add_product_modal"><i class="fa fa-plus-circle text-primary fa-lg"></i></button>
+					<button type="button" class="btn btn-default bg-white btn-flat" id="btn_add_manual_product" title="@lang('lang_v1.add_product') manual"><i class="fa fa-keyboard-o text-warning fa-lg"></i></button>
 				</span>
 			</div>
 		</div>
@@ -231,6 +232,9 @@
 					@endif
 					<th class="text-center tw-text-sm md:!tw-text-base tw-font-bold col-md-2 {{$hide_tax}}">
 						@lang('sale.price_inc_tax')
+					</th>
+					<th class="text-center tw-text-sm md:!tw-text-base tw-font-bold col-md-1">
+						@lang('receipt.discount') %
 					</th>
 					<th class="text-center tw-text-sm md:!tw-text-base tw-font-bold col-md-2">
 						@lang('sale.subtotal')

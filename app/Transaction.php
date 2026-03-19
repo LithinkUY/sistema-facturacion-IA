@@ -313,7 +313,9 @@ class Transaction extends Model
     public function getDueDateAttribute()
     {
         $transaction_date = \Carbon::parse($this->transaction_date);
-        if (! empty($this->pay_term_type) && ! empty($this->pay_term_number)) {
+        if (! empty($this->pay_term_type) && $this->pay_term_type == 'a_coordinar') {
+            $due_date = null;
+        } elseif (! empty($this->pay_term_type) && ! empty($this->pay_term_number)) {
             $due_date = $this->pay_term_type == 'days' ? $transaction_date->addDays($this->pay_term_number) : $transaction_date->addMonths($this->pay_term_number);
         } else {
             $due_date = $transaction_date->addDays(0);

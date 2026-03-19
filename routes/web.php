@@ -28,6 +28,8 @@ use App\Http\Controllers\Install;
 use App\Http\Controllers\InvoiceLayoutController;
 use App\Http\Controllers\InvoiceSchemeController;
 use App\Http\Controllers\LabelsController;
+use App\Http\Controllers\SecurityScanController;
+use App\Http\Controllers\ApiKeyController;
 use App\Http\Controllers\LedgerDiscountController;
 use App\Http\Controllers\LocationSettingsController;
 use App\Http\Controllers\ManageUserController;
@@ -66,6 +68,7 @@ use App\Http\Controllers\OrderTaskController;
 use App\Http\Controllers\AiAgentController;
 use App\Http\Controllers\WhatsAppController;
 use App\Http\Controllers\WhatsAppWebhookController;
+use App\Http\Controllers\RutLookupController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -140,7 +143,7 @@ Route::middleware(['setData', 'auth', 'SetSessionData', 'language', 'timezone', 
 
     Route::resource('brands', BrandController::class);
 
-    Route::resource('payment-account', 'PaymentAccountController');
+    // Route::resource('payment-account', 'PaymentAccountController'); // Controlador no existe, deshabilitado
 
     Route::resource('tax-rates', TaxRateController::class);
 
@@ -204,26 +207,8 @@ Route::middleware(['setData', 'auth', 'SetSessionData', 'language', 'timezone', 
     Route::post('/products/toggle-woocommerce-sync', [ProductController::class, 'toggleWooCommerceSync']);
 
     Route::resource('products', ProductController::class);
-    Route::get('/toggle-subscription/{id}', 'SellPosController@toggleRecurringInvoices');
-    Route::post('/sells/pos/get-types-of-service-details', 'SellPosController@getTypesOfServiceDetails');
-    Route::get('/sells/subscriptions', 'SellPosController@listSubscriptions');
-    Route::get('/sells/duplicate/{id}', 'SellController@duplicateSell');
-    Route::get('/sells/drafts', 'SellController@getDrafts');
-    Route::get('/sells/convert-to-draft/{id}', 'SellPosController@convertToInvoice');
-    Route::get('/sells/convert-to-proforma/{id}', 'SellPosController@convertToProforma');
-    Route::get('/sells/quotations', 'SellController@getQuotations');
-    Route::get('/sells/draft-dt', 'SellController@getDraftDatables');
-    Route::resource('sells', 'SellController')->except(['show']);
-    Route::get('/sells/copy-quotation/{id}', [SellPosController::class, 'copyQuotation']);
 
-    Route::post('/import-purchase-products', [PurchaseController::class, 'importPurchaseProducts']);
-    Route::post('/purchases/update-status', [PurchaseController::class, 'updateStatus']);
-    Route::get('/purchases/get_products', [PurchaseController::class, 'getProducts']);
-    Route::get('/purchases/get_suppliers', [PurchaseController::class, 'getSuppliers']);
-    Route::post('/purchases/get_purchase_entry_row', [PurchaseController::class, 'getPurchaseEntryRow']);
-    Route::post('/purchases/check_ref_number', [PurchaseController::class, 'checkRefNumber']);
-    Route::resource('purchases', PurchaseController::class)->except(['show']);
-
+    // Sells helpers
     Route::get('/toggle-subscription/{id}', [SellPosController::class, 'toggleRecurringInvoices']);
     Route::post('/sells/pos/get-types-of-service-details', [SellPosController::class, 'getTypesOfServiceDetails']);
     Route::get('/sells/subscriptions', [SellPosController::class, 'listSubscriptions']);
@@ -234,7 +219,15 @@ Route::middleware(['setData', 'auth', 'SetSessionData', 'language', 'timezone', 
     Route::get('/sells/quotations', [SellController::class, 'getQuotations']);
     Route::get('/sells/draft-dt', [SellController::class, 'getDraftDatables']);
     Route::resource('sells', SellController::class)->except(['show']);
+    Route::get('/sells/copy-quotation/{id}', [SellPosController::class, 'copyQuotation']);
 
+    Route::post('/import-purchase-products', [PurchaseController::class, 'importPurchaseProducts']);
+    Route::post('/purchases/update-status', [PurchaseController::class, 'updateStatus']);
+    Route::get('/purchases/get_products', [PurchaseController::class, 'getProducts']);
+    Route::get('/purchases/get_suppliers', [PurchaseController::class, 'getSuppliers']);
+    Route::post('/purchases/get_purchase_entry_row', [PurchaseController::class, 'getPurchaseEntryRow']);
+    Route::post('/purchases/check_ref_number', [PurchaseController::class, 'checkRefNumber']);
+    Route::resource('purchases', PurchaseController::class)->except(['show']);
     Route::get('/import-sales', [ImportSalesController::class, 'index']);
     Route::post('/import-sales/preview', [ImportSalesController::class, 'preview']);
     Route::post('/import-sales', [ImportSalesController::class, 'import']);
@@ -491,29 +484,33 @@ Route::middleware(['setData', 'auth', 'SetSessionData', 'language', 'timezone', 
 
     Route::resource('warranties', WarrantyController::class);
 
+    // ============ RUT Lookup - Búsqueda de datos por RUT (DGI/BPS Uruguay) ============
+    Route::get('/api/rut/{rut}', [RutLookupController::class, 'lookup'])->name('api.rut.lookup');
+
     // ============ CFE - Comprobantes Fiscales Electrónicos (DGI Uruguay) ============
     Route::prefix('cfe')->name('cfe.')->group(function () {
-        // Listado y CRUD
+        // Rutas estáticas primero (deben ir ANTES de /{id} para evitar conflictos)
         Route::get('/', [CFEController::class, 'index'])->name('index');
         Route::get('/create', [CFEController::class, 'create'])->name('create');
         Route::post('/', [CFEController::class, 'store'])->name('store');
-        Route::get('/{id}', [CFEController::class, 'show'])->name('show');
-        
-        // Impresión y descarga
-        Route::get('/{id}/print', [CFEController::class, 'print'])->name('print');
-        Route::get('/{id}/download-xml', [CFEController::class, 'downloadXml'])->name('download-xml');
-        
-        // Crear desde venta existente
+
+        // Crear desde venta existente (ruta estática, antes de /{id})
         Route::get('/from-transaction/{transaction_id}', [CFEController::class, 'createFromTransaction'])->name('from-transaction');
         Route::post('/from-transaction/{transaction_id}', [CFEController::class, 'storeFromTransaction'])->name('store-from-transaction');
-        
-        // Acciones DGI
-        Route::post('/{id}/resend', [CFEController::class, 'resend'])->name('resend');
-        Route::get('/{id}/status', [CFEController::class, 'checkStatus'])->name('status');
-        
-        // Configuración
+
+        // Configuración (ruta estática, antes de /{id})
         Route::get('/settings/index', [CFEController::class, 'settings'])->name('settings');
         Route::post('/settings/save', [CFEController::class, 'saveSettings'])->name('save-settings');
+
+        // Rutas con parámetro /{id} (van después de las estáticas)
+        Route::get('/{id}', [CFEController::class, 'show'])->name('show');
+        Route::get('/{id}/edit', [CFEController::class, 'edit'])->name('edit');
+        Route::put('/{id}', [CFEController::class, 'update'])->name('update');
+        Route::get('/{id}/print', [CFEController::class, 'print'])->name('print');
+        Route::get('/{id}/download-xml', [CFEController::class, 'downloadXml'])->name('download-xml');
+        Route::post('/{id}/resend', [CFEController::class, 'resend'])->name('resend');
+        Route::get('/{id}/status', [CFEController::class, 'checkStatus'])->name('status');
+        Route::post('/{id}/update-cae', [CFEController::class, 'updateCae'])->name('update-cae');
     });
 
     Route::resource('dashboard-configurator', DashboardConfiguratorController::class)
@@ -540,6 +537,7 @@ Route::middleware(['setData', 'auth', 'SetSessionData', 'language', 'timezone', 
     // ========== Órdenes de Pedido + Tareas ==========
     Route::get('order-pedidos/my-tasks', [OrderTaskController::class, 'myTasks'])->name('order-pedidos.my-tasks');
     Route::get('order-pedidos/search-products', [OrderPedidoController::class, 'searchProducts'])->name('order-pedidos.search-products');
+    Route::get('order-pedidos/{id}/pdf', [OrderPedidoController::class, 'downloadPdf'])->name('order-pedidos.pdf');
     Route::resource('order-pedidos', OrderPedidoController::class);
     Route::post('order-pedidos/{id}/update-status', [OrderPedidoController::class, 'updateStatus'])->name('order-pedidos.update-status');
     Route::post('order-pedidos/{id}/comment', [OrderPedidoController::class, 'addComment'])->name('order-pedidos.add-comment');
@@ -568,6 +566,8 @@ Route::middleware(['setData', 'auth', 'SetSessionData', 'language', 'timezone', 
     Route::get('whatsapp/chat/{phone}', [WhatsAppController::class, 'chat'])->name('whatsapp.chat');
     Route::get('whatsapp/messages', [WhatsAppController::class, 'getMessages'])->name('whatsapp.messages');
     Route::post('whatsapp/send', [WhatsAppController::class, 'sendMessage'])->name('whatsapp.send');
+    Route::post('whatsapp/send-document', [WhatsAppController::class, 'sendDocument'])->name('whatsapp.send-document');
+    Route::post('whatsapp/send-document', [WhatsAppController::class, 'sendDocument'])->name('whatsapp.send-document');
     Route::get('whatsapp/settings', [WhatsAppController::class, 'settings'])->name('whatsapp.settings');
     Route::post('whatsapp/save-settings', [WhatsAppController::class, 'saveSettings'])->name('whatsapp.save-settings');
     Route::post('whatsapp/toggle-ai', [WhatsAppController::class, 'toggleAI'])->name('whatsapp.toggle-ai');
@@ -588,9 +588,10 @@ Route::middleware(['setData', 'auth', 'SetSessionData', 'language', 'timezone', 
 // });
 
 //common route
-Route::middleware(['auth'])->group(function () {
-    Route::get('/logout', [App\Http\Controllers\Auth\LoginController::class, 'logout'])->name('logout');
-});
+// Logout ya está registrado por Auth::routes() arriba, no duplicar
+// Route::middleware(['auth'])->group(function () {
+//     Route::get('/logout', [App\Http\Controllers\Auth\LoginController::class, 'logout'])->name('logout');
+// });
 
 Route::middleware(['setData', 'auth', 'SetSessionData', 'language', 'timezone'])->group(function () {
     Route::get('/load-more-notifications', [HomeController::class, 'loadMoreNotifications']);
@@ -608,4 +609,20 @@ Route::middleware(['setData', 'auth', 'SetSessionData', 'language', 'timezone'])
     Route::get('/sells/invoice-url/{id}', [SellPosController::class, 'showInvoiceUrl']);
     Route::get('/show-notification/{id}', [HomeController::class, 'showNotification']);
     Route::post('/sell/check-invoice-number', [SellController::class, 'checkInvoiceNumber']);
+
+    // Security Scanner routes
+    Route::get('/security/scan', [SecurityScanController::class, 'index'])->name('security.index');
+    Route::get('/security/run-scan', [SecurityScanController::class, 'scan'])->name('security.scan');
+    Route::post('/security/quarantine', [SecurityScanController::class, 'quarantine'])->name('security.quarantine');
+    Route::post('/security/restore', [SecurityScanController::class, 'restore'])->name('security.restore');
+
+    // API Management routes
+    Route::get('/api-management', [ApiKeyController::class, 'index'])->name('api.management');
+    Route::get('/api-management/docs', [ApiKeyController::class, 'docs'])->name('api.docs');
+    Route::post('/api-management/keys', [ApiKeyController::class, 'store'])->name('api.keys.store');
+    Route::put('/api-management/keys/{id}', [ApiKeyController::class, 'update'])->name('api.keys.update');
+    Route::post('/api-management/keys/{id}/toggle', [ApiKeyController::class, 'toggle'])->name('api.keys.toggle');
+    Route::post('/api-management/keys/{id}/regenerate', [ApiKeyController::class, 'regenerate'])->name('api.keys.regenerate');
+    Route::delete('/api-management/keys/{id}', [ApiKeyController::class, 'destroy'])->name('api.keys.destroy');
+    Route::get('/api-management/keys/{id}/logs', [ApiKeyController::class, 'logs'])->name('api.keys.logs');
 });

@@ -6,9 +6,13 @@ use App\Services\Cfe\CFEService;
 use App\Services\Cfe\CFEXmlGenerator;
 use App\Services\Cfe\RutService;
 use App\Transaction;
+use App\TransactionSellLine;
+use App\TransactionPayment;
+use App\VariationLocationDetails;
 use App\Business;
 use App\Contact;
 use App\CfeSubmission;
+use App\Utils\TransactionUtil;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -25,6 +29,7 @@ class CFEController extends Controller
     protected CFEService $cfeService;
     protected CFEXmlGenerator $xmlGenerator;
     protected RutService $rutService;
+    protected TransactionUtil $transactionUtil;
 
     // Tipos de CFE según DGI Uruguay
     public const CFE_TYPES = [
@@ -82,11 +87,13 @@ class CFEController extends Controller
     public function __construct(
         CFEService $cfeService,
         CFEXmlGenerator $xmlGenerator,
-        RutService $rutService
+        RutService $rutService,
+        TransactionUtil $transactionUtil
     ) {
         $this->cfeService = $cfeService;
         $this->xmlGenerator = $xmlGenerator;
         $this->rutService = $rutService;
+        $this->transactionUtil = $transactionUtil;
     }
 
     /**
@@ -114,6 +121,7 @@ class CFEController extends Controller
                     $html .= '<ul class="dropdown-menu dropdown-menu-right">';
                     
                     $html .= '<li><a href="' . route('cfe.show', $row->id) . '"><i class="fas fa-eye"></i> ' . __('messages.view') . '</a></li>';
+                    $html .= '<li><a href="' . route('cfe.edit', $row->id) . '"><i class="fas fa-edit"></i> Editar</a></li>';
                     $html .= '<li><a href="' . route('cfe.print', $row->id) . '" target="_blank"><i class="fas fa-print"></i> Imprimir Ticket</a></li>';
                     $html .= '<li><a href="' . route('cfe.download-xml', $row->id) . '"><i class="fas fa-file-code"></i> Descargar XML</a></li>';
                     
@@ -142,6 +150,16 @@ class CFEController extends Controller
                 })
                 ->editColumn('created_at', function ($row) {
                     return Carbon::parse($row->created_at)->format('d/m/Y H:i');
+                })
+                ->addColumn('cae_due_date_formatted', function ($row) {
+                    if ($row->cae_due_date) {
+                        try {
+                            return Carbon::parse($row->cae_due_date)->format('d/m/Y');
+                        } catch (\Exception $e) {
+                            return $row->cae_due_date;
+                        }
+                    }
+                    return null;
                 })
                 ->rawColumns(['action', 'status_badge'])
                 ->make(true);
@@ -232,15 +250,25 @@ class CFEController extends Controller
             abort(403, 'Unauthorized action.');
         }
 
-        $request->validate([
+        // Validar según si el cliente es del sistema o manual
+        $isManualCustomer = $request->input('customer_manual') == '1';
+
+        $rules = [
             'cfe_type' => 'required|integer',
-            'customer_id' => 'required|exists:contacts,id',
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'nullable',
             'items.*.name' => 'nullable|string|max:255',
             'items.*.quantity' => 'required|numeric|min:0.01',
             'items.*.unit_price' => 'required|numeric|min:0',
-        ]);
+        ];
+
+        if ($isManualCustomer) {
+            $rules['customer_name_manual'] = 'required|string|max:255';
+        } else {
+            $rules['customer_id'] = 'required|exists:contacts,id';
+        }
+
+        $request->validate($rules);
 
         $business_id = request()->session()->get('user.business_id');
         $user_id = Auth::id();
@@ -249,8 +277,35 @@ class CFEController extends Controller
             DB::beginTransaction();
 
             $business = Business::find($business_id);
-            $customer = Contact::findOrFail($request->customer_id);
             $location = \App\BusinessLocation::find($request->location_id);
+
+            // Datos del receptor: cliente del sistema o manual
+            $customer = null;
+            $receiverDocType = 'CI';
+            $receiverDocument = '';
+            $receiverName = '';
+            $receiverAddress = '';
+            $receiverCity = 'Montevideo';
+            $receiverDepartment = 'Montevideo';
+            $contactId = null;
+
+            if ($isManualCustomer) {
+                $receiverName = $request->input('customer_name_manual');
+                $receiverDocument = preg_replace('/[^0-9]/', '', $request->input('customer_rut_manual', ''));
+                $receiverDocType = strlen($receiverDocument) === 12 ? 'RUT' : 'CI';
+                $receiverAddress = $request->input('customer_address_manual', '');
+                $receiverCity = $request->input('customer_city_manual', 'Montevideo');
+                $receiverDepartment = 'Montevideo';
+            } else {
+                $customer = Contact::findOrFail($request->customer_id);
+                $contactId = $customer->id;
+                $receiverDocType = $this->getDocumentType($customer);
+                $receiverDocument = $customer->tax_number ?? $customer->mobile ?? '';
+                $receiverName = $customer->name ?? trim(($customer->first_name ?? '') . ' ' . ($customer->last_name ?? ''));
+                $receiverAddress = $customer->address_line_1 ?? '';
+                $receiverCity = $customer->city ?? 'Montevideo';
+                $receiverDepartment = $customer->state ?? 'Montevideo';
+            }
 
             // Calcular totales
             $subtotal = 0;
@@ -313,7 +368,7 @@ class CFEController extends Controller
             $cfe->business_id = $business_id;
             $cfe->location_id = $request->location_id;
             $cfe->transaction_id = $transaction ? $transaction->id : null;
-            $cfe->contact_id = $customer->id;
+            $cfe->contact_id = $contactId;
             $cfe->user_id = $user_id;
             $cfe->cfe_type = $request->cfe_type;
             $cfe->series = $series;
@@ -337,12 +392,12 @@ class CFEController extends Controller
             $cfe->emitter_department = $location ? $location->state : 'Montevideo';
             
             // Datos receptor
-            $cfe->receiver_doc_type = $this->getDocumentType($customer);
-            $cfe->receiver_document = $customer->tax_number ?? $customer->mobile ?? '';
-            $cfe->receiver_name = $customer->name ?? $customer->first_name . ' ' . $customer->last_name;
-            $cfe->receiver_address = $customer->address_line_1 ?? '';
-            $cfe->receiver_city = $customer->city ?? 'Montevideo';
-            $cfe->receiver_department = $customer->state ?? 'Montevideo';
+            $cfe->receiver_doc_type = $receiverDocType;
+            $cfe->receiver_document = $receiverDocument;
+            $cfe->receiver_name = $receiverName;
+            $cfe->receiver_address = $receiverAddress;
+            $cfe->receiver_city = $receiverCity;
+            $cfe->receiver_department = $receiverDepartment;
 
             $cfe->save();
 
@@ -352,6 +407,18 @@ class CFEController extends Controller
             
             $cfe->xml_content = $xmlContent;
             $cfe->save();
+
+            // ── Crear Transaction de venta vinculada al CFE ──────────────
+            // Solo para tipos de venta (no notas de crédito/débito/remitos)
+            $cfe_sale_types = [101, 111, 121, 131, 141];
+            if (in_array((int)$request->cfe_type, $cfe_sale_types)) {
+                $transaction = $this->createTransactionFromCFE($cfe, $business, $items, $subtotal, $tax_amount, $total, $user_id, $business_id);
+                if ($transaction) {
+                    $cfe->transaction_id = $transaction->id;
+                    $cfe->save();
+                }
+            }
+            // ─────────────────────────────────────────────────────────────
 
             // Si está configurado auto_submit, enviar a DGI
             if (config('cfe.auto_submit', false)) {
@@ -387,6 +454,176 @@ class CFEController extends Controller
     }
 
     /**
+     * Crea una Transaction de venta vinculada a un CFE.
+     * Esto permite que el CFE aparezca en el dashboard, informes de ventas
+     * y descuente el stock de los productos correctamente.
+     *
+     * @param  CfeSubmission  $cfe
+     * @param  Business       $business
+     * @param  array          $items        ítems ya calculados del CFE
+     * @param  float          $subtotal
+     * @param  float          $tax_amount
+     * @param  float          $total
+     * @param  int            $user_id
+     * @param  int            $business_id
+     * @return Transaction|null
+     */
+    private function createTransactionFromCFE(
+        CfeSubmission $cfe,
+        Business $business,
+        array $items,
+        float $subtotal,
+        float $tax_amount,
+        float $total,
+        int $user_id,
+        int $business_id
+    ): ?Transaction {
+        try {
+            // Obtener número de factura del esquema configurado
+            $invoice_no = $this->transactionUtil->getInvoiceNumber(
+                $business_id,
+                'final',
+                $cfe->location_id
+            );
+
+            // Mapeo de forma de pago CFE → método de pago del sistema
+            $payment_method_map = [
+                1 => 'cash',        // Contado
+                2 => 'credit',      // Crédito
+                3 => 'cash',        // Contra Entrega
+                4 => 'cheque',      // Cheque
+                5 => 'bank_transfer', // Transferencia
+                6 => 'card',        // Tarjeta débito
+                7 => 'card',        // Tarjeta crédito
+                8 => 'custom_pay_1', // Mercado Pago
+                9 => 'other',       // Otro
+            ];
+            $pay_method = $payment_method_map[$cfe->payment_method] ?? 'cash';
+
+            // Determinar contact_id: usar el del CFE si existe, sino buscar "Consumidor Final"
+            $contact_id = $cfe->contact_id;
+            if (empty($contact_id)) {
+                $walk_in = \App\Contact::where('business_id', $business_id)
+                    ->where('type', 'customer')
+                    ->where('is_default', 1)
+                    ->first();
+                $contact_id = $walk_in ? $walk_in->id : \App\Contact::where('business_id', $business_id)
+                    ->where('type', 'customer')
+                    ->value('id');
+            }
+
+            // Crear la transacción
+            $transaction = Transaction::create([
+                'business_id'         => $business_id,
+                'location_id'         => $cfe->location_id,
+                'type'                => 'sell',
+                'status'              => 'final',
+                'payment_status'      => 'paid',
+                'contact_id'          => $contact_id,
+                'invoice_no'          => $invoice_no,
+                'transaction_date'    => $cfe->issue_date ?? Carbon::now(),
+                'total_before_tax'    => $subtotal,
+                'tax_amount'          => $tax_amount,
+                'final_total'         => $total,
+                'discount_type'       => 'fixed',
+                'discount_amount'     => 0,
+                'created_by'          => $user_id,
+                'shipping_charges'    => 0,
+                'additional_notes'    => 'CFE #' . $cfe->series . '-' . $cfe->number . ' (' . ($cfe->receiver_name ?: 'Consumidor Final') . ')',
+            ]);
+
+            // ── Crear líneas de venta y descontar stock ──────────────────
+            foreach ($items as $item) {
+                $product_id   = !empty($item['product_id']) ? (int)$item['product_id'] : null;
+                $variation_id = null;
+
+                if ($product_id) {
+                    // Buscar la variación "DUMMY" (variante única / producto simple)
+                    $variation = \App\Variation::where('product_id', $product_id)->first();
+                    $variation_id = $variation ? $variation->id : null;
+                }
+
+                $qty        = (float) $item['quantity'];
+                $unit_price = (float) $item['unit_price'];
+                $iva_rate   = (float) ($item['iva_rate'] ?? 22);
+                $item_tax   = $unit_price * ($iva_rate / 100);
+                $unit_price_inc_tax = $unit_price + $item_tax;
+
+                // Buscar tax_id que coincida con la tasa de IVA configurada
+                $tax_id = null;
+                if ($iva_rate > 0) {
+                    $tax = \App\TaxRate::where('business_id', $business_id)
+                        ->where('amount', $iva_rate)
+                        ->where('is_tax_group', 0)
+                        ->first();
+                    $tax_id = $tax ? $tax->id : null;
+                }
+
+                $sell_line = TransactionSellLine::create([
+                    'transaction_id'          => $transaction->id,
+                    'product_id'              => $product_id,
+                    'variation_id'            => $variation_id,
+                    'quantity'                => $qty,
+                    'unit_price_before_discount' => $unit_price,
+                    'unit_price'              => $unit_price,
+                    'line_discount_type'      => 'fixed',
+                    'line_discount_amount'    => 0,
+                    'item_tax'                => $item_tax,
+                    'tax_id'                  => $tax_id,
+                    'unit_price_inc_tax'      => $unit_price_inc_tax,
+                    'sell_line_note'          => $item['name'] ?? '',
+                    'quantity_returned'       => 0,
+                    'sub_unit_id'             => null,
+                ]);
+
+                // Descontar stock si el producto tiene control de inventario
+                if ($product_id && $variation_id) {
+                    $product = \App\Product::find($product_id);
+                    if ($product && $product->enable_stock == 1) {
+                        VariationLocationDetails::where('variation_id', $variation_id)
+                            ->where('product_id', $product_id)
+                            ->where('location_id', $cfe->location_id)
+                            ->decrement('qty_available', $qty);
+                    }
+                }
+            }
+
+            // ── Registrar el pago ─────────────────────────────────────────
+            // Solo si la forma de pago es contado (no crédito)
+            if ($cfe->payment_method != 2) {
+                TransactionPayment::create([
+                    'transaction_id'  => $transaction->id,
+                    'amount'          => $total,
+                    'method'          => $pay_method,
+                    'is_return'       => 0,
+                    'paid_on'         => $cfe->issue_date ?? Carbon::now(),
+                    'created_by'      => $user_id,
+                    'business_id'     => $business_id,
+                    'payment_for'     => $contact_id,
+                    'payment_ref_no'  => 'CFE-' . $cfe->series . $cfe->number,
+                ]);
+            }
+
+            Log::info('Transaction creada desde CFE', [
+                'cfe_id'         => $cfe->id,
+                'transaction_id' => $transaction->id,
+                'total'          => $total,
+            ]);
+
+            return $transaction;
+
+        } catch (\Exception $e) {
+            Log::error('Error al crear Transaction desde CFE', [
+                'cfe_id'  => $cfe->id,
+                'message' => $e->getMessage(),
+                'trace'   => $e->getTraceAsString(),
+            ]);
+            // No lanzamos excepción para no cancelar la creación del CFE
+            return null;
+        }
+    }
+
+    /**
      * Mostrar detalle de un CFE
      */
     public function show($id)
@@ -402,6 +639,99 @@ class CFEController extends Controller
             'cfe_types' => self::CFE_TYPES,
             'payment_methods' => self::PAYMENT_METHODS,
         ]);
+    }
+
+    /**
+     * Formulario de edición de CFE
+     */
+    public function edit($id)
+    {
+        if (!auth()->user()->can('sell.update') && !auth()->user()->hasRole('Admin#' . session('business.id'))) {
+            abort(403, 'Unauthorized action.');
+        }
+
+        $business_id = request()->session()->get('user.business_id');
+
+        $cfe = CfeSubmission::where('business_id', $business_id)
+            ->with(['transaction', 'contact', 'location'])
+            ->findOrFail($id);
+
+        return view('cfe.edit', [
+            'cfe' => $cfe,
+            'cfe_types' => self::CFE_TYPES,
+            'payment_methods' => self::PAYMENT_METHODS,
+            'iva_rates' => self::IVA_RATES,
+        ]);
+    }
+
+    /**
+     * Actualizar datos de un CFE
+     */
+    public function update(Request $request, $id)
+    {
+        if (!auth()->user()->can('sell.update') && !auth()->user()->hasRole('Admin#' . session('business.id'))) {
+            abort(403, 'Unauthorized action.');
+        }
+
+        $business_id = request()->session()->get('user.business_id');
+
+        $cfe = CfeSubmission::where('business_id', $business_id)->findOrFail($id);
+
+        $request->validate([
+            'notes'        => 'nullable|string|max:1000',
+            'cae'          => 'nullable|string|max:50',
+            'cae_due_date' => 'nullable|date',
+            'status'       => 'required|in:pending,submitted,accepted,rejected,error',
+            'payment_method' => 'required|integer',
+        ]);
+
+        $cfe->notes          = $request->input('notes');
+        $cfe->payment_method = $request->input('payment_method');
+        $cfe->status         = $request->input('status');
+
+        if ($request->filled('cae')) {
+            $cfe->cae = $request->input('cae');
+        }
+        if ($request->filled('cae_due_date')) {
+            $cfe->cae_due_date = $request->input('cae_due_date');
+        }
+
+        // Actualizar ítems si se enviaron
+        if ($request->has('items') && is_array($request->input('items'))) {
+            $items = [];
+            foreach ($request->input('items') as $item) {
+                if (!empty($item['name']) || !empty($item['description'])) {
+                    $qty        = (float) ($item['quantity'] ?? 1);
+                    $unitPrice  = (float) ($item['unit_price'] ?? 0);
+                    $ivaRate    = (int)   ($item['iva_rate'] ?? 22);
+                    $subtotal   = $qty * $unitPrice;
+                    $ivaAmt     = $subtotal * $ivaRate / 100;
+                    $items[] = [
+                        'name'        => $item['name'] ?? $item['description'],
+                        'description' => $item['description'] ?? $item['name'],
+                        'quantity'    => $qty,
+                        'unit'        => $item['unit'] ?? 'unidad',
+                        'unit_price'  => $unitPrice,
+                        'iva_rate'    => $ivaRate,
+                        'subtotal'    => $subtotal,
+                        'iva_amount'  => $ivaAmt,
+                    ];
+                }
+            }
+            if (!empty($items)) {
+                $subtotal   = array_sum(array_column($items, 'subtotal'));
+                $tax_amount = array_sum(array_column($items, 'iva_amount'));
+                $cfe->items      = $items;
+                $cfe->subtotal   = $subtotal;
+                $cfe->tax_amount = $tax_amount;
+                $cfe->total      = $subtotal + $tax_amount;
+            }
+        }
+
+        $cfe->save();
+
+        return redirect()->route('cfe.show', $id)
+            ->with('status', ['success' => 1, 'msg' => 'CFE actualizado correctamente.']);
     }
 
     /**
@@ -579,6 +909,34 @@ class CFEController extends Controller
     }
 
     /**
+     * Actualizar CAE y fecha de vencimiento manualmente (para registros existentes)
+     */
+    public function updateCae(Request $request, $id)
+    {
+        $business_id = request()->session()->get('user.business_id');
+        $cfe = CfeSubmission::where('business_id', $business_id)->findOrFail($id);
+
+        $request->validate([
+            'cae' => 'nullable|string|max:50',
+            'cae_due_date' => 'nullable|date',
+        ]);
+
+        if ($request->filled('cae')) {
+            $cfe->cae = $request->cae;
+        }
+        if ($request->filled('cae_due_date')) {
+            $cfe->cae_due_date = Carbon::parse($request->cae_due_date);
+        }
+        $cfe->save();
+
+        return response()->json([
+            'success' => true,
+            'msg' => 'CAE actualizado correctamente.',
+            'cae_due_date' => $cfe->cae_due_date ? $cfe->cae_due_date->format('d/m/Y') : null,
+        ]);
+    }
+
+    /**
      * API: Consultar estado de CFE en DGI
      */
     public function checkStatus($id)
@@ -592,6 +950,7 @@ class CFEController extends Controller
             'success' => true,
             'status' => $cfe->status,
             'cae' => $cfe->cae,
+            'cae_due_date' => $cfe->cae_due_date ? $cfe->cae_due_date->format('d/m/Y') : null,
             'track_id' => $cfe->track_id,
         ]);
     }
@@ -762,6 +1121,7 @@ class CFEController extends Controller
             // Actualizar estado
             $cfe->status = $response['success'] ? 'accepted' : 'rejected';
             $cfe->cae = $response['cae'] ?? null;
+            $cfe->cae_due_date = $response['cae_due_date'] ?? ($response['caeDueDate'] ?? ($response['fecha_vencimiento_cae'] ?? null));
             $cfe->track_id = $response['trackingCode'] ?? null;
             $cfe->dgi_response = $response;
             $cfe->submitted_at = Carbon::now();
@@ -849,6 +1209,7 @@ class CFEController extends Controller
         $cfe->xml_content = $result['xmlContent'] ?? '';
         $cfe->signed_xml = $result['signedXml'] ?? '';
         $cfe->cae = $result['cae'] ?? null;
+        $cfe->cae_due_date = $result['cae_due_date'] ?? ($result['caeDueDate'] ?? ($result['fecha_vencimiento_cae'] ?? null));
         $cfe->track_id = $result['trackingCode'] ?? null;
         $cfe->dgi_response = $result;
 

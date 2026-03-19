@@ -89,56 +89,61 @@ class ContactUtil extends Util
 
     public function createNewContact($input)
     {
-        //Check Contact id
-        $count = 0;
+        // Si el usuario ingresó un contact_id manual, verificar que no exista
         if (! empty($input['contact_id'])) {
-            $count = Contact::where('business_id', $input['business_id'])
-                            ->where('contact_id', $input['contact_id'])
-                            ->count();
+            $exists = Contact::where('business_id', $input['business_id'])
+                             ->where('contact_id', $input['contact_id'])
+                             ->exists();
+            if ($exists) {
+                throw new \Exception('El ID de contacto "' . $input['contact_id'] . '" ya está en uso. Dejá el campo vacío para generarlo automáticamente.', 1);
+            }
         }
-        if ($count == 0) {
-            //Update reference count
-            $ref_count = $this->setAndGetReferenceCount('contacts', $input['business_id']);
 
-            if (empty($input['contact_id'])) {
-                //Generate reference number
-                $input['contact_id'] = $this->generateReferenceNumber('contacts', $ref_count, $input['business_id']);
-            }
+        // Generar contact_id automático si está vacío, con reintento en caso de colisión
+        if (empty($input['contact_id'])) {
+            $attempts = 0;
+            do {
+                $ref_count = $this->setAndGetReferenceCount('contacts', $input['business_id']);
+                $generated = $this->generateReferenceNumber('contacts', $ref_count, $input['business_id']);
+                $exists = Contact::where('business_id', $input['business_id'])
+                                 ->where('contact_id', $generated)
+                                 ->exists();
+                $attempts++;
+            } while ($exists && $attempts < 10);
 
-            $opening_balance = isset($input['opening_balance']) ? $input['opening_balance'] : 0;
-            if (isset($input['opening_balance'])) {
-                unset($input['opening_balance']);
-            }
-
-            //Assigned the user
-            $assigned_to_users = [];
-            if (! empty($input['assigned_to_users'])) {
-                $assigned_to_users = $input['assigned_to_users'];
-                unset($input['assigned_to_users']);
-            }
-
-            $contact = Contact::create($input);
-
-            //Assigned the user
-            if (! empty($assigned_to_users)) {
-                $contact->userHavingAccess()->sync($assigned_to_users);
-            }
-
-            //Add opening balance
-            if (! empty($opening_balance)) {
-                $transactionUtil = new TransactionUtil();
-                $transactionUtil->createOpeningBalanceTransaction($contact->business_id, $contact->id, $opening_balance, $contact->created_by, false);
-            }
-
-            $output = ['success' => true,
-                'data' => $contact,
-                'msg' => __('contact.added_success'),
-            ];
-
-            return $output;
-        } else {
-            throw new \Exception('Error Processing Request', 1);
+            $input['contact_id'] = $generated;
         }
+
+        $opening_balance = isset($input['opening_balance']) ? $input['opening_balance'] : 0;
+        if (isset($input['opening_balance'])) {
+            unset($input['opening_balance']);
+        }
+
+        //Assigned the user
+        $assigned_to_users = [];
+        if (! empty($input['assigned_to_users'])) {
+            $assigned_to_users = $input['assigned_to_users'];
+            unset($input['assigned_to_users']);
+        }
+
+        $contact = Contact::create($input);
+
+        //Assigned the user
+        if (! empty($assigned_to_users)) {
+            $contact->userHavingAccess()->sync($assigned_to_users);
+        }
+
+        //Add opening balance
+        if (! empty($opening_balance)) {
+            $transactionUtil = new TransactionUtil();
+            $transactionUtil->createOpeningBalanceTransaction($contact->business_id, $contact->id, $opening_balance, $contact->created_by, false);
+        }
+
+        return [
+            'success' => true,
+            'data' => $contact,
+            'msg' => __('contact.added_success'),
+        ];
     }
 
     public function updateContact($input, $id, $business_id)

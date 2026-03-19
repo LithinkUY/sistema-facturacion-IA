@@ -1,6 +1,6 @@
 <div class="modal-dialog modal-lg" role="document">
   <div class="modal-content">
-    {!! Form::open(['url' => action([\App\Http\Controllers\ProductController::class, 'saveQuickProduct']), 'method' => 'post', 'id' => 'quick_add_product_form' ]) !!}
+    {!! Form::open(['url' => action([\App\Http\Controllers\ProductController::class, 'saveQuickProduct']), 'method' => 'post', 'id' => 'quick_add_product_form', 'files' => true ]) !!}
 
     <div class="modal-header">
 	    <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
@@ -132,6 +132,16 @@
           <div class="form-group">
             {!! Form::label('weight',  __('lang_v1.weight') . ':') !!}
             {!! Form::text('weight', null, ['class' => 'form-control', 'placeholder' => __('lang_v1.weight')]); !!}
+          </div>
+        </div>
+        <div class="col-sm-4">
+          <div class="form-group">
+            {!! Form::label('image', __('lang_v1.product_image') . ':') !!}
+            {!! Form::file('image', ['id' => 'quick_upload_image', 'accept' => 'image/*', 'class' => 'form-control']); !!}
+            <small class="help-block">@lang('purchase.max_file_size', ['size' => (config('constants.document_size_limit') / 1000000)])</small>
+            <div id="quick_image_preview" style="margin-top:5px; display:none;">
+              <img id="quick_image_preview_img" src="" style="max-height:80px; max-width:120px; border:1px solid #ddd; border-radius:4px;">
+            </div>
           </div>
         </div>
         <div class="clearfix"></div>
@@ -278,11 +288,14 @@
         var form = $("form#quick_add_product_form");
         var url = form.attr('action');
         form.find('button[type="submit"]').attr('disabled', true);
+        var formData = new FormData(form[0]);
         $.ajax({
             method: "POST",
             url: url,
             dataType: 'json',
-            data: $(form).serialize(),
+            data: formData,
+            processData: false,
+            contentType: false,
             success: function(data){
                 $('.quick_add_product_modal').modal('hide');
                 if( data.success){
@@ -305,6 +318,21 @@
             }
         });
         return false;
+      }
+    });
+
+    // Image preview
+    $(document).on('change', '#quick_upload_image', function() {
+      var file = this.files[0];
+      if (file) {
+        var reader = new FileReader();
+        reader.onload = function(e) {
+          $('#quick_image_preview_img').attr('src', e.target.result);
+          $('#quick_image_preview').show();
+        };
+        reader.readAsDataURL(file);
+      } else {
+        $('#quick_image_preview').hide();
       }
     });
   });

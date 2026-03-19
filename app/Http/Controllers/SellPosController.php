@@ -339,7 +339,18 @@ class SellPosController extends Controller
             if ($input['status'] == 'quotation') {
                 $input['status'] = 'draft';
                 $input['is_quotation'] = 1;
-                $input['sub_status'] = 'quotation';
+                //Check if unified quotation
+                if (!empty($input['is_unified'])) {
+                    $input['sub_status'] = 'quotation_unified';
+                } else {
+                    $input['sub_status'] = 'quotation';
+                }
+
+                //Append terms_url to staff_note if provided
+                if (!empty($input['terms_url'])) {
+                    $terms_url = trim($input['terms_url']);
+                    $input['staff_note'] = (!empty($input['staff_note']) ? $input['staff_note'] . "\n\n" : '') . "URL: " . $terms_url;
+                }
             } elseif ($input['status'] == 'proforma') {
                 $input['status'] = 'draft';
                 $input['sub_status'] = 'proforma';
@@ -380,6 +391,17 @@ class SellPosController extends Controller
                 }
 
                 $user_id = $request->session()->get('user.id');
+
+                //Default discount values for unified quotations (form hides these fields)
+                if (!isset($input['discount_type'])) {
+                    $input['discount_type'] = 'percentage';
+                }
+                if (!isset($input['discount_amount'])) {
+                    $input['discount_amount'] = 0;
+                }
+                if (!isset($input['tax_rate_id'])) {
+                    $input['tax_rate_id'] = null;
+                }
 
                 $discount = ['discount_type' => $input['discount_type'],
                     'discount_amount' => $input['discount_amount'],
@@ -785,6 +807,11 @@ class SellPosController extends Controller
             $output['printer_config'] = $this->businessUtil->printerConfig($business_id, $location_details->printer_id);
             $output['data'] = $receipt_details;
         } else {
+            // Si se pide formato lista para presupuesto, forzar el diseño presupuesto_lista
+            if (request()->input('format') == 'lista' && !empty($receipt_details->design) && $receipt_details->design == 'presupuesto') {
+                $receipt_details->design = 'presupuesto_lista';
+            }
+
             $layout = !empty($receipt_details->design) ? 'sale_pos.receipts.' . $receipt_details->design : 'sale_pos.receipts.classic';
 
             $output['html_content'] = view($layout, compact('receipt_details'))->render();
@@ -1141,7 +1168,19 @@ class SellPosController extends Controller
             if ($input['status'] == 'quotation') {
                 $input['status'] = 'draft';
                 $input['is_quotation'] = 1;
-                $input['sub_status'] = 'quotation';
+                //Preserve unified sub_status if it was unified, or check input
+                $transaction = Transaction::find($id);
+                if (!empty($input['is_unified']) || (!empty($transaction) && $transaction->sub_status == 'quotation_unified')) {
+                    $input['sub_status'] = 'quotation_unified';
+                } else {
+                    $input['sub_status'] = 'quotation';
+                }
+
+                //Append terms_url to staff_note if provided
+                if (!empty($input['terms_url'])) {
+                    $terms_url = trim($input['terms_url']);
+                    $input['staff_note'] = (!empty($input['staff_note']) ? $input['staff_note'] . "\n\n" : '') . "URL: " . $terms_url;
+                }
             } elseif ($input['status'] == 'proforma') {
                 $input['status'] = 'draft';
                 $input['sub_status'] = 'proforma';
@@ -1206,6 +1245,17 @@ class SellPosController extends Controller
                 $business_id = $request->session()->get('user.business_id');
                 $user_id = $request->session()->get('user.id');
                 $commsn_agnt_setting = $request->session()->get('business.sales_cmsn_agnt');
+
+                //Default discount values for unified quotations (form hides these fields)
+                if (!isset($input['discount_type'])) {
+                    $input['discount_type'] = 'percentage';
+                }
+                if (!isset($input['discount_amount'])) {
+                    $input['discount_amount'] = 0;
+                }
+                if (!isset($input['tax_rate_id'])) {
+                    $input['tax_rate_id'] = null;
+                }
 
                 $discount = ['discount_type' => $input['discount_type'],
                     'discount_amount' => $input['discount_amount'],
@@ -1739,8 +1789,10 @@ class SellPosController extends Controller
                 $edit_price = auth()->user()->can('edit_product_price_from_pos_screen');
             }
 
+            $is_unified = request()->get('is_unified') == 'true' ? true : false;
+
             $output['html_content'] = view('sale_pos.product_row')
-                ->with(compact('product', 'row_count', 'tax_dropdown', 'enabled_modules', 'pos_settings', 'sub_units', 'discount', 'waiters', 'edit_discount', 'edit_price', 'purchase_line_id', 'warranties', 'quantity', 'is_direct_sell', 'so_line', 'is_sales_order', 'last_sell_line', 'is_serial_no'))
+                ->with(compact('product', 'row_count', 'tax_dropdown', 'enabled_modules', 'pos_settings', 'sub_units', 'discount', 'waiters', 'edit_discount', 'edit_price', 'purchase_line_id', 'warranties', 'quantity', 'is_direct_sell', 'so_line', 'is_sales_order', 'last_sell_line', 'is_serial_no', 'is_unified'))
                 ->render();
         }
 
@@ -1885,7 +1937,7 @@ class SellPosController extends Controller
 
         if ($transaction_status == 'quotation') {
             $query->where('transactions.status', 'draft')
-                ->where('sub_status', 'quotation');
+                ->whereIn('sub_status', ['quotation', 'quotation_unified']);
         } elseif ($transaction_status == 'draft') {
             $query->where('transactions.status', 'draft')
                 ->whereNull('sub_status');
@@ -2951,7 +3003,7 @@ class SellPosController extends Controller
             $business_id = request()->session()->get('user.business_id');
 
             $transaction = Transaction::where('business_id', $business_id)
-                ->where('sub_status', 'quotation')
+                ->whereIn('sub_status', ['quotation', 'quotation_unified'])
                 ->findOrFail($id);
 
             DB::beginTransaction();

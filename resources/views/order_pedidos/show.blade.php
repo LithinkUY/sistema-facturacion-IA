@@ -147,7 +147,7 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                @forelse($order->items as $i => $item)
+                                @forelse($order->lines as $i => $item)
                                 <tr>
                                     <td style="color:#999">{{ $i + 1 }}</td>
                                     <td>
@@ -189,11 +189,11 @@
                             </tbody>
                         </table>
                     </div>
-                    @if($order->items->count() > 0)
+                    @if($order->lines->count() > 0)
                     <div style="display:flex;justify-content:flex-end;margin-top:15px">
                         <div class="totals-box" style="min-width:280px">
                             @php
-                                $subtotal = $order->items->sum(function($item) { return $item->quantity * $item->unit_price; });
+                                $subtotal = $order->lines->sum(function($item) { return $item->quantity * $item->unit_price; });
                                 $tax = $order->tax_amount ?? 0;
                                 $discount = $order->discount_amount ?? 0;
                                 $total = $subtotal + $tax - $discount;
@@ -326,7 +326,7 @@
                     </div>
                     <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f0f0f0">
                         <span style="color:#999">Items:</span>
-                        <span style="font-weight:600">{{ $order->items->count() }}</span>
+                        <span style="font-weight:600">{{ $order->lines->count() }}</span>
                     </div>
                     <div style="display:flex;justify-content:space-between;padding:8px 0">
                         <span style="color:#999">Tareas:</span>
@@ -339,6 +339,9 @@
                 <div style="display:flex;flex-direction:column;gap:8px">
                     <a href="{{ url('/order-pedidos/' . $order->id . '/edit') }}" class="btn btn-info btn-block" style="border-radius:8px">
                         <i class="fas fa-edit"></i> Editar Orden
+                    </a>
+                    <a href="{{ url('/order-pedidos/' . $order->id . '/pdf') }}" class="btn btn-default btn-block" style="border-radius:8px" target="_blank">
+                        <i class="fas fa-file-pdf" style="color:#c62828"></i> Descargar PDF
                     </a>
                     @if($order->status == 'pending')
                     <button class="btn btn-success btn-block status-change-btn" data-status="approved" style="border-radius:8px">

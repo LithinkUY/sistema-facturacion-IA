@@ -98,6 +98,16 @@ class DgiApiService
             if ($response->getStatusCode() === 200 && isset($payload['success']) && $payload['success']) {
                 Log::info('CFE enviado exitosamente a DGI');
 
+                // Normalizar el campo de fecha de vencimiento del CAE
+                // DGI puede devolver el campo con distintos nombres
+                if (!isset($payload['cae_due_date'])) {
+                    $payload['cae_due_date'] = $payload['caeFechaVencimiento']
+                        ?? $payload['caeFechaVcto']
+                        ?? $payload['cae_fecha_vencimiento']
+                        ?? $payload['FechaVctoCAE']
+                        ?? null;
+                }
+
                 return $payload;
             }
 

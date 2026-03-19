@@ -259,7 +259,7 @@ return [
     'added_success' => '添加成功',
     'deleted_success' => '删除成功',
     'enable_disable_modules' => '启用/禁用模块',
-    'opening_stock_help_text' => "<br><br>对于可变产品，使用"分隔的库存数量<br>（例如：100|150|200）",
+    'opening_stock_help_text' => "<br><br>对于可变产品，使用'分隔的库存数量<br>（例如：100|150|200）",
     'applicable_tax_help' => '<br><br/>如果采购价（不含税）与采购价（含税）不同，则必须提供税率名称。',
     'sale_delete_success' => '销售删除成功',
     'click_to_edit' => '点击编辑',

@@ -420,8 +420,14 @@ class ProductController extends Controller
         //product screen view from module
         $pos_module_data = $this->moduleUtil->getModuleData('get_product_screen_top_view');
 
+        // Locations for opening stock inline
+        $locations = BusinessLocation::forDropdown($business_id);
+
+        $enable_expiry = request()->session()->get('business.enable_product_expiry');
+        $enable_lot = request()->session()->get('business.enable_lot_number');
+
         return view('product.create')
-            ->with(compact('categories', 'brands', 'units', 'taxes', 'barcode_types', 'default_profit_percent', 'tax_attributes', 'barcode_default', 'business_locations', 'duplicate_product', 'sub_categories', 'rack_details', 'selling_price_group_count', 'module_form_parts', 'product_types', 'common_settings', 'warranties', 'pos_module_data'));
+            ->with(compact('categories', 'brands', 'units', 'taxes', 'barcode_types', 'default_profit_percent', 'tax_attributes', 'barcode_default', 'business_locations', 'duplicate_product', 'sub_categories', 'rack_details', 'selling_price_group_count', 'module_form_parts', 'product_types', 'common_settings', 'warranties', 'pos_module_data', 'locations', 'enable_expiry', 'enable_lot'));
     }
 
     private function product_types()
@@ -551,6 +557,14 @@ class ProductController extends Controller
             }
 
             Media::uploadMedia($product->business_id, $product, $request, 'product_brochure', true);
+
+            // Process inline opening stock (from create form, without redirect)
+            if ($product->enable_stock == 1 && ! empty($request->input('opening_stock'))) {
+                $user_id = $request->session()->get('user.id');
+                $transaction_date = $request->session()->get('financial_year.start');
+                $transaction_date = \Carbon::createFromFormat('Y-m-d', $transaction_date)->toDateTimeString();
+                $this->productUtil->addSingleProductOpeningStock($business_id, $product, $request->input('opening_stock'), $transaction_date, $user_id);
+            }
 
             DB::commit();
             $output = ['success' => 1,
@@ -1545,6 +1559,11 @@ class ProductController extends Controller
             }
 
             $product_details['warranty_id'] = ! empty($request->input('warranty_id')) ? $request->input('warranty_id') : null;
+
+            //upload image if present
+            if ($request->hasFile('image')) {
+                $product_details['image'] = $this->productUtil->uploadFile($request, 'image', config('constants.product_img_path'), 'image');
+            }
 
             DB::beginTransaction();
 

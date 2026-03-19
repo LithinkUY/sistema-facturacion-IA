@@ -837,6 +837,8 @@ class SellController extends Controller
 
         $statuses = Transaction::sell_statuses();
 
+        $is_unified = request()->get('unified', 0) ? true : false;
+
         if ($sale_type == 'sales_order') {
             $status = 'ordered';
         }
@@ -885,7 +887,8 @@ class SellController extends Controller
                 'is_order_request_enabled',
                 'users',
                 'default_price_group_id',
-                'change_return'
+                'change_return',
+                'is_unified'
             ));
     }
 
@@ -1398,7 +1401,7 @@ class SellController extends Controller
                 );
 
             if ($is_quotation == 1) {
-                $sells->where('transactions.sub_status', 'quotation');
+                $sells->whereIn('transactions.sub_status', ['quotation', 'quotation_unified']);
 
                 if (! auth()->user()->can('quotation.view_all') && auth()->user()->can('quotation.view_own')) {
                     $sells->where('transactions.created_by', request()->session()->get('user.id'));
@@ -1483,6 +1486,12 @@ class SellController extends Controller
                                     <a href="#" class="print-invoice" data-href="'.route('sell.printInvoice', [$row->id]).'"><i class="fas fa-print" aria-hidden="true"></i>'.__('messages.print').'</a>
                                 </li>';
 
+                        if ($row->sub_status == 'quotation') {
+                            $html .= '<li>
+                                        <a href="#" class="print-invoice" data-href="'.route('sell.printInvoice', [$row->id]).'?format=lista"><i class="fas fa-list" aria-hidden="true"></i> Imprimir Lista</a>
+                                    </li>';
+                        }
+
                         if (config('constants.enable_download_pdf')) {
                             $sub_status = $row->sub_status == 'proforma' ? 'proforma' : '';
                             $html .= '<li>
@@ -1510,7 +1519,7 @@ class SellController extends Controller
                                 </li>';
                         }
 
-                        if ($row->sub_status == 'quotation') {
+                        if (in_array($row->sub_status, ['quotation', 'quotation_unified'])) {
                             $html .= '<li>
                                         <a href="'.action([\App\Http\Controllers\SellPosController::class, 'copyQuotation'],[$row->id]).'" 
                                         class="copy_quotation"><i class="fas fa-copy"></i>'.
@@ -1539,6 +1548,10 @@ class SellController extends Controller
 
                     if ($row->sub_status == 'proforma') {
                         $invoice_no .= '<br><span class="label bg-gray">'.__('lang_v1.proforma_invoice').'</span>';
+                    }
+
+                    if ($row->sub_status == 'quotation_unified') {
+                        $invoice_no .= '<br><span class="label bg-green">Unificada</span>';
                     }
 
                     if (! empty($row->is_export)) {

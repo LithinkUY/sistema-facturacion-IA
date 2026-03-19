@@ -895,6 +895,28 @@ class WhatsAppService
     }
 
     /**
+     * Enviar imagen por WhatsApp
+     */
+    public function sendImageMessage($to, $mediaId, $caption = '')
+    {
+        $payload = [
+            'messaging_product' => 'whatsapp',
+            'recipient_type' => 'individual',
+            'to' => $to,
+            'type' => 'image',
+            'image' => [
+                'id' => $mediaId,
+            ],
+        ];
+
+        if (!empty($caption)) {
+            $payload['image']['caption'] = $caption;
+        }
+
+        return $this->sendRequest($payload);
+    }
+
+    /**
      * Subir archivo como media a WhatsApp Cloud API
      *
      * @param string $filePath Ruta local del archivo

@@ -108,10 +108,15 @@ class OrderPedido extends Model
     public function getTaskProgressAttribute()
     {
         $tasks = $this->tasks;
-        if ($tasks->isEmpty()) return 0;
-        
+        $total = $tasks->count();
         $completed = $tasks->where('status', 'completed')->count();
-        return round(($completed / $tasks->count()) * 100);
+        $percent = $total > 0 ? round(($completed / $total) * 100) : 0;
+        
+        return [
+            'percent' => $percent,
+            'completed' => $completed,
+            'total' => $total,
+        ];
     }
 
     // ===== Scopes =====

@@ -358,6 +358,13 @@
 
     </div>
     @endcomponent
+
+    @can('product.opening_stock')
+    <div id="opening_stock_section" @if(!empty($duplicate_product) && $duplicate_product->enable_stock == 0) style="display:none" @endif>
+        @include('product.partials.quick_product_opening_stock', ['locations' => $locations])
+    </div>
+    @endcan
+
     <div class="row">
         <div class="col-sm-12">
             <input type="hidden" name="submit_type" id="submit_type">
@@ -366,10 +373,6 @@
                     @if($selling_price_group_count)
                     <button type="submit" value="submit_n_add_selling_prices" class="tw-dw-btn tw-dw-btn-warning tw-dw-btn-lg tw-text-white submit_product_form">@lang('lang_v1.save_n_add_selling_price_group_prices')</button>
                     @endif
-
-                    @can('product.opening_stock')
-                    <button id="opening_stock_button" @if(!empty($duplicate_product) && $duplicate_product->enable_stock == 0) disabled @endif type="submit" value="submit_n_add_opening_stock" class="tw-dw-btn tw-dw-btn-lg tw-text-white bg-purple submit_product_form">@lang('lang_v1.save_n_add_opening_stock')</button>
-                    @endcan
 
                     <button type="submit" value="save_n_add_another" class="tw-dw-btn tw-dw-btn-lg bg-maroon submit_product_form">@lang('lang_v1.save_n_add_another')</button>
 
@@ -389,10 +392,19 @@
 @section('javascript')
 
 <script src="{{ asset('js/product.js?v=' . $asset_v) }}"></script>
+<script src="{{ asset('js/opening_stock.js?v=' . $asset_v) }}"></script>
 
 <script type="text/javascript">
     $(document).ready(function() {
         __page_leave_confirmation('#product_add_form');
+
+        // Datepicker para fechas de vencimiento en stock de apertura
+        $('.os_exp_date').datepicker({
+            autoclose: true,
+            format: 'dd-mm-yyyy',
+            clearBtn: true,
+        });
+
         onScan.attachTo(document, {
             suffixKeyCodes: [13], // enter-key expected at the end of a scan
             reactToPaste: true, // Compatibility to built-in scanners in paste-mode (as opposed to keyboard-mode)

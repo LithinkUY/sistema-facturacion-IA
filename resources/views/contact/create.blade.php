@@ -68,8 +68,9 @@
                         <span class="input-group-addon">
                             <i class="fa fa-id-card"></i>
                         </span>
-                        {!! Form::text('tax_number', null, ['class' => 'form-control','placeholder' => __('lang_v1.rut_placeholder')]); !!}
+                        {!! Form::text('tax_number', null, ['class' => 'form-control', 'id' => 'contact_rut_input', 'placeholder' => 'Ej: 123456789012 o 12345678']); !!}
                     </div>
+                    <p class="help-block" style="font-size:11px;">Ingres&aacute; el RUT o CI manualmente</p>
                 </div>
             </div>
             <div class="col-md-4 customer_fields">
@@ -593,4 +594,6 @@
     {!! Form::close() !!}
   
   </div><!-- /.modal-content -->
+
+@include('contact.partials.rut_lookup_script')
 </div><!-- /.modal-dialog -->

@@ -100,59 +100,117 @@
 
             {{-- Datos del Cliente (Receptor) --}}
             @component('components.widget', ['class' => 'box-info', 'title' => 'Datos del Cliente (Receptor)'])
+
+                {{-- Toggle: cliente del sistema o manual --}}
                 <div class="row">
-                    <div class="col-md-6">
+                    <div class="col-md-12">
                         <div class="form-group">
-                            <label for="customer_id">Cliente: <span class="text-danger">*</span></label>
-                            <div class="input-group">
-                                <select name="customer_id" id="customer_id" class="form-control select2" required style="width: 100%;">
-                                    <option value="">Seleccionar cliente...</option>
-                                    @foreach($customers as $id => $name)
-                                        <option value="{{ $id }}">{{ $name }}</option>
-                                    @endforeach
-                                </select>
-                                <span class="input-group-btn">
-                                    <button type="button" class="btn btn-default bg-white btn-flat add_new_customer" 
-                                            data-name="" title="Agregar nuevo cliente">
-                                        <i class="fa fa-plus-circle text-primary fa-lg"></i>
-                                    </button>
-                                </span>
+                            <div class="btn-group" role="group">
+                                <button type="button" class="btn btn-sm btn-primary active" id="btn_cliente_sistema">
+                                    <i class="fa fa-search"></i> Buscar en el sistema
+                                </button>
+                                <button type="button" class="btn btn-sm btn-default" id="btn_cliente_manual">
+                                    <i class="fa fa-pencil"></i> Ingresar cliente manual
+                                </button>
+                            </div>
+                            <input type="hidden" name="customer_manual" id="customer_manual" value="0">
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Bloque: cliente del sistema --}}
+                <div id="bloque_cliente_sistema">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="customer_id">Cliente: <span class="text-danger">*</span></label>
+                                <div class="input-group">
+                                    <select name="customer_id" id="customer_id" class="form-control select2" style="width: 100%;">
+                                        <option value="">Seleccionar cliente...</option>
+                                        @foreach($customers as $id => $name)
+                                            <option value="{{ $id }}">{{ $name }}</option>
+                                        @endforeach
+                                    </select>
+                                    <span class="input-group-btn">
+                                        <button type="button" class="btn btn-default bg-white btn-flat add_new_customer"
+                                                data-name="" title="Agregar nuevo cliente">
+                                            <i class="fa fa-plus-circle text-primary fa-lg"></i>
+                                        </button>
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="form-group">
+                                <label>RUT/CI:</label>
+                                <input type="text" id="customer_document" class="form-control" readonly>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="form-group">
+                                <label>Tipo Doc:</label>
+                                <input type="text" id="customer_doc_type" class="form-control" readonly>
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-3">
-                        <div class="form-group">
-                            <label>RUT/CI:</label>
-                            <input type="text" id="customer_document" class="form-control" readonly>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>Direccion:</label>
+                                <input type="text" id="customer_address" class="form-control" readonly>
+                            </div>
                         </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="form-group">
-                            <label>Tipo Doc:</label>
-                            <input type="text" id="customer_doc_type" class="form-control" readonly>
+                        <div class="col-md-3">
+                            <div class="form-group">
+                                <label>Ciudad:</label>
+                                <input type="text" id="customer_city" class="form-control" readonly>
+                            </div>
                         </div>
-                    </div>
-                </div>
-                <div class="row">
-                    <div class="col-md-6">
-                        <div class="form-group">
-                            <label>Dirección:</label>
-                            <input type="text" id="customer_address" class="form-control" readonly>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="form-group">
-                            <label>Ciudad:</label>
-                            <input type="text" id="customer_city" class="form-control" readonly>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="form-group">
-                            <label>Departamento:</label>
-                            <input type="text" id="customer_department" class="form-control" readonly>
+                        <div class="col-md-3">
+                            <div class="form-group">
+                                <label>Departamento:</label>
+                                <input type="text" id="customer_department" class="form-control" readonly>
+                            </div>
                         </div>
                     </div>
                 </div>
+
+                {{-- Bloque: cliente manual --}}
+                <div id="bloque_cliente_manual" style="display:none;">
+                    <div class="row">
+                        <div class="col-md-5">
+                            <div class="form-group">
+                                <label for="customer_name_manual">Nombre / Razon Social: <span class="text-danger">*</span></label>
+                                <input type="text" name="customer_name_manual" id="customer_name_manual"
+                                       class="form-control" placeholder="Nombre completo o razon social">
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="form-group">
+                                <label for="customer_rut_manual">RUT / CI:</label>
+                                <input type="text" name="customer_rut_manual" id="customer_rut_manual"
+                                       class="form-control" placeholder="Ej: 21234567890 o 12345678">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label for="customer_address_manual">Direccion:</label>
+                                <input type="text" name="customer_address_manual" id="customer_address_manual"
+                                       class="form-control" placeholder="Direccion (opcional)">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label for="customer_city_manual">Ciudad:</label>
+                                <input type="text" name="customer_city_manual" id="customer_city_manual"
+                                       class="form-control" value="Montevideo">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
             @endcomponent
 
             {{-- Productos/Servicios --}}
@@ -343,6 +401,29 @@ $(document).ready(function() {
             // Limpiar el campo manual
             $(`.product-manual-wrapper[data-row="${row}"] input`).val('');
         }
+    });
+
+    // Toggle cliente sistema / manual
+    $('#btn_cliente_sistema').click(function() {
+        $('#customer_manual').val('0');
+        $('#bloque_cliente_sistema').show();
+        $('#bloque_cliente_manual').hide();
+        $('#btn_cliente_sistema').addClass('active btn-primary').removeClass('btn-default');
+        $('#btn_cliente_manual').addClass('btn-default').removeClass('active btn-primary');
+        // Limpiar campos manuales
+        $('#customer_name_manual, #customer_rut_manual, #customer_address_manual').val('');
+        $('#customer_city_manual').val('Montevideo');
+    });
+
+    $('#btn_cliente_manual').click(function() {
+        $('#customer_manual').val('1');
+        $('#bloque_cliente_sistema').hide();
+        $('#bloque_cliente_manual').show();
+        $('#btn_cliente_manual').addClass('active btn-primary').removeClass('btn-default');
+        $('#btn_cliente_sistema').addClass('btn-default').removeClass('active btn-primary');
+        // Limpiar select de cliente
+        $('#customer_id').val('').trigger('change');
+        $('#customer_document, #customer_doc_type, #customer_address, #customer_city, #customer_department').val('');
     });
 
     // Botón agregar nuevo cliente - abrir modal
@@ -555,6 +636,17 @@ $(document).ready(function() {
     // Enviar formulario
     $('#cfe_form').submit(function(e) {
         e.preventDefault();
+        
+        // Validar cliente
+        var isManual = $('#customer_manual').val() === '1';
+        if (!isManual && !$('#customer_id').val()) {
+            toastr.error('Seleccione un cliente del sistema o use "Ingresar cliente manual"');
+            return;
+        }
+        if (isManual && !$('#customer_name_manual').val().trim()) {
+            toastr.error('Ingrese el nombre del cliente');
+            return;
+        }
         
         // Validar que cada fila tenga producto seleccionado o nombre manual
         var valid = true;

@@ -236,10 +236,11 @@
               {!! Form::label('tax_number', __('contact.tax_no') . ':') !!}
               <div class="input-group">
                   <span class="input-group-addon">
-                      <i class="fa fa-info"></i>
+                      <i class="fa fa-id-card"></i>
                   </span>
-                  {!! Form::text('tax_number', $contact->tax_number, ['class' => 'form-control', 'placeholder' => __('contact.tax_no')]); !!}
+                  {!! Form::text('tax_number', $contact->tax_number, ['class' => 'form-control', 'id' => 'contact_rut_input', 'placeholder' => 'Ej: 123456789012 o 12345678']); !!}
               </div>
+              <p class="help-block" style="font-size:11px;">Ingres&aacute; el RUT o CI manualmente</p>
           </div>
         </div>
 
@@ -592,6 +593,8 @@
     </div>
 
     {!! Form::close() !!}
+
+  @include('contact.partials.rut_lookup_script')
 
   </div><!-- /.modal-content -->
 </div><!-- /.modal-dialog -->

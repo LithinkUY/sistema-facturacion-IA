@@ -24,6 +24,10 @@ $(document).ready(function() {
     }
 
     $('select#select_location_id').change(function() {
+        // Actualizar el campo hidden location_id con la sucursal seleccionada
+        var selected_location_id = $(this).val();
+        $('input#location_id').val(selected_location_id);
+
         reset_pos_form();
 
         var default_price_group = $(this).find(':selected').data('default_price_group')
@@ -979,39 +983,11 @@ $(document).ready(function() {
                         },
                     },
                 },
-                tax_number: {
-                    remote: {
-                        url: '/contacts/check-tax-number',
-                        type: 'post',
-                        data: {
-                            contact_id: function() {
-                                return $('#hidden_id').val();
-                            },
-                            tax_number: function() {
-                                return $('#tax_number').val();
-                            },
-                        },
-                        dataFilter: function(response) {
-                            try {
-                                var taxResult = JSON.parse(response);
-                                if (taxResult && taxResult.is_tax_number_exists === true) {
-                                    return '"' + (taxResult.msg || LANG.tax_number_already_exists) + '"';
-                                }
-                                return 'true';
-                            } catch (e) {
-                                return 'true';
-                            }
-                        }
-                    }
-                },
             },
             messages: {
                 contact_id: {
                     required: LANG.contact_id_required,
                     remote: LANG.contact_id_already_exists,
-                },
-                tax_number: {
-                    required: LANG.tax_number_required,
                 },
             },
             submitHandler: function(form) {
@@ -1180,6 +1156,10 @@ $(document).ready(function() {
 
         if (sell_form.valid()) {
             window.onbeforeunload = null;
+            // Asegurar que location_id refleja la sucursal seleccionada antes de enviar
+            if ($('select#select_location_id').length) {
+                $('input#location_id').val($('select#select_location_id').val());
+            }
             $(this).attr('disabled', true);
             sell_form.submit();
         }
@@ -1207,6 +1187,9 @@ $(document).ready(function() {
     );
     
     $('select#select_location_id').on('change', function(e) {
+        // Ensure hidden input is updated when location selector changes
+        $('input#location_id').val($(this).val());
+
         $('input#suggestion_page').val(1);
         var location_id = $('input#location_id').val();
         if (location_id != '' || location_id != undefined) {
@@ -1398,6 +1381,89 @@ $(document).ready(function() {
     $('div.view_modal').on('show.bs.modal', function() {
         __currency_convert_recursively($(this));
     });
+
+    // ===== PRODUCTO MANUAL EN POS =====
+    $('#btn_add_manual_product').on('click', function() {
+        if ($('input#location_id').val() == '') {
+            toastr.warning(LANG.select_location);
+            return;
+        }
+        // Reset campos
+        $('#manual_product_name').val('');
+        $('#manual_product_price').val('');
+        $('#manual_product_qty').val(1);
+        $('#manual_product_discount').val(0);
+        $('#manual_product_modal').modal('show');
+        setTimeout(function(){ $('#manual_product_name').focus(); }, 400);
+    });
+
+    $('#save_manual_product').on('click', function() {
+        var name = $.trim($('#manual_product_name').val());
+        var price = parseFloat($('#manual_product_price').val());
+        var qty = parseFloat($('#manual_product_qty').val()) || 1;
+        var discount = parseFloat($('#manual_product_discount').val()) || 0;
+        var location_id = $('input#location_id').val();
+
+        if (!name) {
+            toastr.error('Ingrese el nombre del producto');
+            $('#manual_product_name').focus();
+            return;
+        }
+        if (isNaN(price) || price <= 0) {
+            toastr.error('Ingrese un precio válido');
+            $('#manual_product_price').focus();
+            return;
+        }
+
+        var btn = $(this);
+        btn.attr('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> Guardando...');
+
+        $.ajax({
+            method: 'POST',
+            url: '/products/save_manual_product',
+            dataType: 'json',
+            data: {
+                name: name,
+                selling_price: price,
+                location_id: location_id,
+                _token: $('meta[name="csrf-token"]').attr('content')
+            },
+            success: function(data) {
+                btn.attr('disabled', false).html('<i class="fa fa-check"></i> Agregar al carrito');
+                if (data.success) {
+                    $('#manual_product_modal').modal('hide');
+                    // Añadir la fila al POS con cantidad
+                    pos_product_row(data.variation.id, null, null, qty);
+                    // Aplicar descuento si corresponde
+                    if (discount > 0) {
+                        setTimeout(function() {
+                            var lastRow = $('table#pos_table tbody tr:last');
+                            var discInput = lastRow.find('input.pos_line_discount_percent, input.row_discount_amount');
+                            if (discInput.length > 0) {
+                                __write_number(discInput.first(), discount);
+                                discInput.first().trigger('change');
+                            }
+                        }, 600);
+                    }
+                    toastr.success(data.msg || 'Producto agregado');
+                } else {
+                    toastr.error(data.msg || 'Error al crear producto');
+                }
+            },
+            error: function() {
+                btn.attr('disabled', false).html('<i class="fa fa-check"></i> Agregar al carrito');
+                toastr.error('Error de conexión');
+            }
+        });
+    });
+
+    // Permitir Enter en el campo nombre del modal manual
+    $('#manual_product_modal').on('keypress', '#manual_product_name, #manual_product_price, #manual_product_qty, #manual_product_discount', function(e) {
+        if (e.which === 13) {
+            $('#save_manual_product').trigger('click');
+        }
+    });
+    // ===== FIN PRODUCTO MANUAL =====
 
     $('table#pos_table').on('change', 'select.sub_unit', function() {
         var tr = $(this).closest('tr');
@@ -1753,6 +1819,11 @@ function pos_product_row(variation_id = null, purchase_line_id = null, weighing_
             is_serial_no = true;
         }
         
+        var is_unified = false;
+        if ($('#is_unified').length > 0 && $('#is_unified').val() == '1') {
+            is_unified = true;
+        }
+        
         $.ajax({
             method: 'GET',
             url: '/sells/pos/get_product_row/' + variation_id + '/' + location_id,
@@ -1768,7 +1839,8 @@ function pos_product_row(variation_id = null, purchase_line_id = null, weighing_
                 quantity: quantity,
                 is_sales_order: is_sales_order,
                 disable_qty_alert: disable_qty_alert,
-                is_draft: is_draft
+                is_draft: is_draft,
+                is_unified: is_unified
             },
             dataType: 'json',
             success: function(result) {

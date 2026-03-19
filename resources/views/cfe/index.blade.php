@@ -70,6 +70,7 @@
                         <th>Total</th>
                         <th>Estado</th>
                         <th>CAE</th>
+                        <th>Vto. CAE</th>
                     </tr>
                 </thead>
                 <tbody></tbody>
@@ -105,7 +106,12 @@ $(document).ready(function() {
             { data: 'receiver_document', name: 'receiver_document' },
             { data: 'total', name: 'total' },
             { data: 'status_badge', name: 'status' },
-            { data: 'cae', name: 'cae' }
+            { data: 'cae', name: 'cae' },
+            { data: 'cae_due_date_formatted', name: 'cae_due_date', orderable: true, searchable: false,
+              render: function(data) {
+                  return data ? data : '<span class="text-muted">Pendiente</span>';
+              }
+            }
         ],
         order: [[1, 'desc']],
         language: {

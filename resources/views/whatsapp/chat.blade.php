@@ -15,8 +15,19 @@
     .wa-bubble .meta { font-size: 0.7em; color: #667781; text-align: right; margin-top: 2px; }
     .wa-bubble .ai-badge { font-size: 0.65em; color: #25d366; font-weight: bold; }
     .wa-full-input { padding: 10px 16px; background: #f0f2f5; display: flex; gap: 8px; align-items: center; }
-    .wa-full-input input { flex: 1; border: none; border-radius: 20px; padding: 10px 16px; outline: none; }
+    .wa-full-input input[type="text"] { flex: 1; border: none; border-radius: 20px; padding: 10px 16px; outline: none; }
     .wa-full-input .send { width: 42px; height: 42px; border-radius: 50%; background: #075e54; color: #fff; border: none; cursor: pointer; }
+    .wa-full-input .attach { width: 42px; height: 42px; border-radius: 50%; background: #f0f2f5; color: #54656f; border: 1px solid #d1d7db; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.1em; }
+    .wa-full-input .attach:hover { background: #e0e0e0; }
+    .wa-bubble .file-msg { display: flex; align-items: center; gap: 8px; padding: 4px 0; }
+    .wa-bubble .file-msg .file-icon { font-size: 1.5em; color: #128c7e; }
+    .wa-bubble .file-msg .file-name { font-size: 0.85em; color: #111b21; font-weight: 500; }
+    .wa-full-input .btn-attach { width: 38px; height: 38px; border-radius: 50%; background: #fff; border: 1px solid #ccc; color: #555; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+    .wa-full-input .btn-attach:hover { background: #e9ecef; }
+    #wa_attach_input { display: none; }
+    .wa-bubble.media-bubble .media-preview { margin-top: 4px; }
+    .wa-bubble.media-bubble .media-preview img { max-width: 220px; border-radius: 6px; }
+    .wa-bubble.media-bubble .media-preview .doc-icon { font-size: 2em; color: #075e54; }
 </style>
 @endsection
 
@@ -52,6 +63,12 @@
         </div>
 
         <div class="wa-full-input">
+            {{-- Botón adjuntar --}}
+            <button class="btn-attach" id="btn_attach" title="Adjuntar documento o imagen" {{ !$isConfigured ? 'disabled' : '' }}>
+                <i class="fas fa-paperclip"></i>
+            </button>
+            <input type="file" id="wa_attach_input" accept=".pdf,.jpg,.jpeg,.png,.gif,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip">
+
             <input type="text" id="msg_input" placeholder="Escribe un mensaje..." autocomplete="off" {{ !$isConfigured ? 'disabled' : '' }}>
             <button class="send" id="btn_send" {{ !$isConfigured ? 'disabled' : '' }}><i class="fas fa-paper-plane"></i></button>
         </div>
@@ -69,6 +86,84 @@ $(document).ready(function() {
     // Scroll al final
     var el = document.getElementById('messages');
     el.scrollTop = el.scrollHeight;
+
+    // Botón adjuntar → abrir selector de archivo
+    $('#btn_attach').click(function() {
+        $('#wa_attach_input').trigger('click');
+    });
+
+    // Cuando se selecciona un archivo
+    $('#wa_attach_input').on('change', function() {
+        var file = this.files[0];
+        if (!file) return;
+
+        var maxMB = 16;
+        if (file.size > maxMB * 1024 * 1024) {
+            toastr.error('El archivo es muy grande. Máximo ' + maxMB + 'MB.');
+            $(this).val('');
+            return;
+        }
+
+        // Pedir caption opcional
+        var caption = window.prompt('Descripción / mensaje para el archivo (opcional):', '');
+        if (caption === null) { $(this).val(''); return; } // canceló
+
+        var isImage = file.type.startsWith('image/');
+        var previewName = file.name;
+
+        // Mostrar burbuja pendiente
+        var time = new Date().toLocaleTimeString('es-UY', {hour:'2-digit', minute:'2-digit'});
+        var previewHtml;
+        if (isImage) {
+            var objectUrl = URL.createObjectURL(file);
+            previewHtml = '<div class="wa-bubble out media-bubble">' +
+                '<div class="media-preview"><img src="' + objectUrl + '" alt="' + previewName + '"></div>' +
+                (caption ? '<div>' + $('<div>').text(caption).html() + '</div>' : '') +
+                '<div class="meta">' + time + ' <span style="color:#999;">✓</span></div></div>';
+        } else {
+            previewHtml = '<div class="wa-bubble out media-bubble">' +
+                '<div class="media-preview"><span class="doc-icon"><i class="fas fa-file-alt"></i></span> ' +
+                $('<div>').text(previewName).html() + '</div>' +
+                (caption ? '<div>' + $('<div>').text(caption).html() + '</div>' : '') +
+                '<div class="meta">' + time + ' <span style="color:#999;">⌛</span></div></div>';
+        }
+        $('#messages').append(previewHtml);
+        el.scrollTop = el.scrollHeight;
+
+        // Enviar via AJAX multipart
+        var formData = new FormData();
+        formData.append('phone', phone);
+        formData.append('file', file);
+        formData.append('caption', caption);
+        formData.append('contact_name', '{{ $contactName }}');
+        formData.append('_token', csrfToken);
+
+        $.ajax({
+            url: '{{ url("/whatsapp/send-document") }}',
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(res) {
+                if (res.success) {
+                    toastr.success('Archivo enviado correctamente');
+                } else {
+                    toastr.error(res.error || 'Error al enviar el archivo');
+                    if (res.token_expired) {
+                        toastr.warning('Actualizá el Access Token en Configuración → WhatsApp');
+                    }
+                }
+            },
+            error: function(xhr) {
+                var msg = xhr.responseJSON ? (xhr.responseJSON.message || JSON.stringify(xhr.responseJSON.errors || {})) : 'Error al enviar';
+                toastr.error(msg);
+            },
+            complete: function() {
+                // Limpiar input file para permitir re-selección del mismo archivo
+                $('#wa_attach_input').val('');
+            }
+        });
+    });
 
     // Enviar
     function sendMsg() {
@@ -90,6 +185,76 @@ $(document).ready(function() {
 
     $('#btn_send').click(sendMsg);
     $('#msg_input').keypress(function(e) { if (e.which === 13) sendMsg(); });
+
+    // Botón adjuntar — abre el selector de archivos
+    $('#btn_attach').click(function() {
+        $('#file_input').click();
+    });
+
+    // Al seleccionar un archivo, enviarlo
+    $('#file_input').change(function() {
+        var file = this.files[0];
+        if (!file) return;
+
+        var maxMB = 20;
+        if (file.size > maxMB * 1024 * 1024) {
+            toastr.error('El archivo supera los ' + maxMB + ' MB permitidos');
+            $(this).val('');
+            return;
+        }
+
+        var caption = prompt('Agregar un mensaje/descripcion (opcional):', '') || '';
+
+        var formData = new FormData();
+        formData.append('_token', csrfToken);
+        formData.append('phone', phone);
+        formData.append('file', file);
+        formData.append('caption', caption);
+        formData.append('contact_name', '{{ $contactName }}');
+
+        // Mostrar preview en el chat
+        var time = new Date().toLocaleTimeString('es-UY', {hour:'2-digit', minute:'2-digit'});
+        var isImage = file.type.startsWith('image/');
+        var previewHtml;
+        if (isImage) {
+            var objectUrl = URL.createObjectURL(file);
+            previewHtml = '<div class="wa-bubble out"><div class="file-msg"><img src="' + objectUrl + '" style="max-width:200px;max-height:160px;border-radius:6px;"></div>';
+        } else {
+            previewHtml = '<div class="wa-bubble out"><div class="file-msg"><span class="file-icon"><i class="fas fa-file-alt"></i></span><span class="file-name">' + $("<div>").text(file.name).html() + '</span></div>';
+        }
+        if (caption) previewHtml += '<div style="font-size:0.85em;margin-top:2px;">' + $("<div>").text(caption).html() + '</div>';
+        previewHtml += '<div class="meta">' + time + ' <span style="color:#999;">✓</span></div></div>';
+        $('#messages').append(previewHtml);
+        el.scrollTop = el.scrollHeight;
+
+        // Deshabilitar botones mientras sube
+        $('#btn_attach, #btn_send').prop('disabled', true);
+        $('#btn_attach i').removeClass('fa-paperclip').addClass('fa-spinner fa-spin');
+
+        $.ajax({
+            url: '{{ url("/whatsapp/send-document") }}',
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(res) {
+                if (!res.success) {
+                    toastr.error(res.error || 'Error al enviar el archivo');
+                } else {
+                    toastr.success('Archivo enviado: ' + res.filename);
+                }
+            },
+            error: function(xhr) {
+                var err = xhr.responseJSON && xhr.responseJSON.error ? xhr.responseJSON.error : 'Error al enviar el archivo';
+                toastr.error(err);
+            },
+            complete: function() {
+                $('#btn_attach, #btn_send').prop('disabled', false);
+                $('#btn_attach i').removeClass('fa-spinner fa-spin').addClass('fa-paperclip');
+                $('#file_input').val('');
+            }
+        });
+    });
 
     // Poll cada 5 segundos
     setInterval(function() {

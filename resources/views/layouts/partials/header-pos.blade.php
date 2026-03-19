@@ -44,7 +44,7 @@
                             {{ $default_location->name }}
                         @endif
                     @else
-                    {{ $transaction->location->name }}
+                    {{ $transaction->location?->name ?? __('sale.pos') }}
                     @endif
                 </div>
                 <div

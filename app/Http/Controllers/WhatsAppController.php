@@ -6,6 +6,7 @@ use App\Services\WhatsAppService;
 use App\WhatsappMessage;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class WhatsAppController extends Controller
 {
@@ -96,7 +97,53 @@ class WhatsAppController extends Controller
         $text = $request->message;
         $business_id = request()->session()->get('user.business_id');
 
-        $result = $this->whatsAppService->sendTextMessage($phone, $text);
+        // Verificar si hay conversación reciente (últimas 24h) con este número
+        $hasRecentConversation = WhatsappMessage::where('business_id', $business_id)
+            ->where('phone_number', $phone)
+            ->where('direction', 'incoming')
+            ->where('created_at', '>=', now()->subHours(24))
+            ->exists();
+
+        if ($hasRecentConversation) {
+            // Dentro de la ventana de 24h: enviar texto libre
+            $result = $this->whatsAppService->sendTextMessage($phone, $text);
+        } else {
+            // Fuera de ventana de 24h: intentar con texto y si falla, intentar con template
+            $result = $this->whatsAppService->sendTextMessage($phone, $text);
+
+            // Si falla por ventana de conversación, intentar con template
+            if (!$result['success'] && isset($result['data']['error']['code'])) {
+                $errCode = $result['data']['error']['code'];
+                // 131047 = Re-engagement message, 131026 = Message failed to send (not in 24h window)
+                if (in_array($errCode, [131047, 131026])) {
+                    Log::info("WhatsApp: Fuera de ventana 24h para {$phone}, intentando con template hello_world");
+                    $result = $this->whatsAppService->sendTemplateMessage($phone, 'hello_world', 'en_US');
+                    if ($result['success']) {
+                        // Guardar el template como primer mensaje
+                        WhatsappMessage::create([
+                            'business_id' => $business_id,
+                            'wa_message_id' => $result['message_id'] ?? null,
+                            'phone_number' => $phone,
+                            'contact_name' => $request->input('contact_name', null),
+                            'direction' => 'outgoing',
+                            'message_type' => 'template',
+                            'message' => '[Template: hello_world]',
+                            'status' => 'sent',
+                            'is_ai_response' => false,
+                        ]);
+                        // Ahora intentar enviar el texto real
+                        $result = $this->whatsAppService->sendTextMessage($phone, $text);
+                    }
+                }
+            }
+        }
+
+        Log::info("WhatsApp sendMessage resultado para {$phone}", [
+            'success' => $result['success'],
+            'message_id' => $result['message_id'] ?? null,
+            'error' => $result['error'] ?? null,
+            'has_recent' => $hasRecentConversation,
+        ]);
 
         // Guardar en BD
         WhatsappMessage::create([
@@ -119,6 +166,11 @@ class WhatsAppController extends Controller
                 $result['error'] = '⚠️ Token de WhatsApp expirado. Ve a Configuración → Actualiza el Access Token desde Meta Developer Console.';
                 $result['token_expired'] = true;
             }
+        }
+
+        // Agregar aviso si es número nuevo sin ventana de conversación
+        if ($result['success'] && !$hasRecentConversation) {
+            $result['warning'] = 'Este contacto no tiene conversación reciente. Si no le llega, es posible que necesite escribirte primero (regla de WhatsApp Business 24h).';
         }
 
         return response()->json($result);
@@ -205,6 +257,85 @@ class WhatsAppController extends Controller
         $conversations = WhatsappMessage::getConversations($business_id);
 
         return response()->json(['success' => true, 'conversations' => $conversations]);
+    }
+
+    /**
+     * Enviar documento/archivo adjunto por WhatsApp
+     * Acepta: PDF, imágenes (jpg, png), documentos
+     */
+    public function sendDocument(Request $request)
+    {
+        $request->validate([
+            'phone'   => 'required|string',
+            'file'    => 'required|file|max:20480|mimes:pdf,jpg,jpeg,png,gif,webp,doc,docx,xls,xlsx,txt',
+            'caption' => 'nullable|string|max:1024',
+        ]);
+
+        $phone = WhatsAppService::formatPhone($request->phone);
+        $business_id = request()->session()->get('user.business_id');
+        $uploadedFile = $request->file('file');
+        $caption = $request->input('caption', '');
+        $originalName = $uploadedFile->getClientOriginalName();
+        $mimeType = $uploadedFile->getMimeType();
+
+        // Guardar temporalmente
+        $tmpPath = $uploadedFile->getRealPath();
+
+        try {
+            // Subir a WhatsApp Cloud API
+            $uploadResult = $this->whatsAppService->uploadMedia($tmpPath, $mimeType);
+
+            if (!$uploadResult['success']) {
+                return response()->json([
+                    'success' => false,
+                    'error'   => 'No se pudo subir el archivo: ' . ($uploadResult['error'] ?? 'Error desconocido'),
+                ]);
+            }
+
+            $mediaId = $uploadResult['media_id'];
+
+            // Determinar tipo: documento o imagen
+            $isImage = in_array($mimeType, ['image/jpeg', 'image/png', 'image/gif', 'image/webp']);
+
+            if ($isImage) {
+                $result = $this->whatsAppService->sendImageMessage($phone, $mediaId, $caption);
+                $msgType = 'image';
+            } else {
+                $result = $this->whatsAppService->sendDocumentMessage($phone, $mediaId, $originalName, $caption);
+                $msgType = 'document';
+            }
+
+            // Guardar en BD
+            WhatsappMessage::create([
+                'business_id'   => $business_id,
+                'wa_message_id' => $result['message_id'] ?? null,
+                'phone_number'  => $phone,
+                'contact_name'  => $request->input('contact_name', null),
+                'direction'     => 'outgoing',
+                'message_type'  => $msgType,
+                'message'       => '[Archivo: ' . $originalName . ']' . ($caption ? ' ' . $caption : ''),
+                'status'        => $result['success'] ? 'sent' : 'failed',
+                'is_ai_response' => false,
+                'error_message' => $result['error'] ?? null,
+            ]);
+
+            if (!$result['success']) {
+                return response()->json([
+                    'success' => false,
+                    'error'   => $result['error'] ?? 'Error al enviar el archivo',
+                ]);
+            }
+
+            return response()->json([
+                'success'  => true,
+                'filename' => $originalName,
+                'type'     => $msgType,
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('WhatsApp sendDocument error', ['message' => $e->getMessage()]);
+            return response()->json(['success' => false, 'error' => $e->getMessage()]);
+        }
     }
 
     /**

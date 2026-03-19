@@ -1,7 +1,7 @@
 <div class="modal-dialog modal-lg" role="document">
     <div class="modal-content">
 
-        {!! Form::open(['url' => action([\App\Http\Controllers\BusinessLocationController::class, 'update'], [$location->id]), 'method' => 'PUT', 'id' => 'business_location_add_form' ]) !!}
+        {!! Form::open(['url' => action([\App\Http\Controllers\BusinessLocationController::class, 'update'], [$location->id]), 'method' => 'PUT', 'id' => 'business_location_add_form', 'files' => true ]) !!}
 
         {!! Form::hidden('hidden_id', $location->id, ['id' => 'hidden_id']); !!}
         <div class="modal-header">
@@ -142,11 +142,17 @@
                         'placeholder' => $location_custom_field2]); !!}
                     </div>
                 </div>
+                {{-- custom_field3 se reserva para el logo de la sucursal (usado internamente) --}}
                 <div class="col-sm-3">
                     <div class="form-group">
-                        {!! Form::label('custom_field3', $location_custom_field3 . ':') !!}
-                        {!! Form::text('custom_field3', $location->custom_field3, ['class' => 'form-control',
-                        'placeholder' => $location_custom_field3]); !!}
+                        <label>@lang('invoice.invoice_logo') <small class="text-muted">(@lang('lang_v1.location'))</small>:</label>
+                        @if(!empty($location->custom_field3) && file_exists(public_path('uploads/invoice_logos/'.$location->custom_field3)))
+                            <div class="mb-1">
+                                <img src="{{ asset('uploads/invoice_logos/'.$location->custom_field3) }}" style="max-height:50px; max-width:120px; border:1px solid #ddd; padding:3px; border-radius:3px;">
+                            </div>
+                        @endif
+                        {!! Form::file('location_logo', ['class' => 'form-control', 'accept' => 'image/jpeg,image/png,image/gif']) !!}
+                        <small class="text-muted">@lang('lang_v1.used_for_browser_based_printing'). JPG/PNG/GIF</small>
                     </div>
                 </div>
                 <div class="col-sm-3">

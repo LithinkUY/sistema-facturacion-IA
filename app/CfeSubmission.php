@@ -48,6 +48,7 @@ class CfeSubmission extends Model
         'xml_content',
         'signed_xml',
         'cae',
+        'cae_due_date',
         'track_id',
         'dgi_response',
         'submitted_at',
@@ -57,6 +58,7 @@ class CfeSubmission extends Model
     protected $casts = [
         'issue_date' => 'datetime',
         'due_date' => 'datetime',
+        'cae_due_date' => 'date',
         'submitted_at' => 'datetime',
         'items' => 'array',
         'dgi_response' => 'array',
@@ -69,6 +71,7 @@ class CfeSubmission extends Model
     protected $dates = [
         'issue_date',
         'due_date',
+        'cae_due_date',
         'submitted_at',
         'created_at',
         'updated_at',
@@ -244,10 +247,11 @@ class CfeSubmission extends Model
     /**
      * Marcar como aceptado
      */
-    public function markAsAccepted($cae = null, $trackId = null, $response = null)
+    public function markAsAccepted($cae = null, $trackId = null, $response = null, $caeDueDate = null)
     {
         $this->status = self::STATUS_ACCEPTED;
         $this->cae = $cae;
+        $this->cae_due_date = $caeDueDate;
         $this->track_id = $trackId;
         $this->dgi_response = $response;
         $this->save();

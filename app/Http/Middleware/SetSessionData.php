@@ -41,7 +41,7 @@ class SetSessionData
             ];
 
             $request->session()->put('user', $session_data);
-            $request->session()->put('business', $business->toArray());
+            $request->session()->put('business', $business);
             $request->session()->put('currency', $currency_data);
 
             //set current financial year to session

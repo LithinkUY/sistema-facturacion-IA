@@ -645,9 +645,18 @@ class ContactController extends Controller
             DB::rollBack();
             \Log::emergency('File:'.$e->getFile().'Line:'.$e->getLine().'Message:'.$e->getMessage());
 
+            // Mostrar mensaje real si es un error de negocio (código 1), genérico para otros
+            $errorMsg = $e->getCode() === 1
+                ? $e->getMessage()
+                : __('messages.something_went_wrong');
+
             $output = ['success' => false,
-                'msg' => __('messages.something_went_wrong'),
+                'msg' => $errorMsg,
             ];
+        }
+
+        if ($request->ajax() || $request->wantsJson()) {
+            return response()->json($output);
         }
 
         return $output;

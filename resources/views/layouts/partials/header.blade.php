@@ -162,6 +162,20 @@
                         </a>
                     @endcan
                 @endif
+
+                {{-- Botón Generar Factura CFE --}}
+                @if(auth()->user()->hasRole('Admin#' . session('business.id')) || auth()->user()->hasAnyPermission(['sell.view', 'sell.create']))
+                    <a href="{{ url('/cfe/create') }}"
+                        class="sm:tw-inline-flex tw-transition-all tw-duration-200 tw-gap-2 tw-bg-green-600 hover:tw-bg-green-500 tw-py-1.5 tw-px-3 tw-rounded-lg tw-items-center tw-justify-center tw-text-sm tw-font-medium tw-ring-1 tw-ring-white/10 hover:tw-text-white tw-text-white">
+                        <svg aria-hidden="true" class="tw-size-5 tw-hidden md:tw-block" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                            <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                            <path d="M14 3v4a1 1 0 0 0 1 1h4"/>
+                            <path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z"/>
+                            <path d="M9 15l2 2l4 -4"/>
+                        </svg>
+                        Generar Factura
+                    </a>
+                @endif
                 @if (Module::has('Repair'))
                     @includeIf('repair::layouts.partials.header')
                 @endif

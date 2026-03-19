@@ -965,9 +965,23 @@ class TransactionUtil extends Util
         $transaction = Transaction::find($transaction_id);
         $transaction_type = $transaction->type;
 
+        // Si la sucursal tiene RUT propio (location_id), tiene identidad fiscal propia
+        // y debe mostrarse con su nombre y RUT en la factura, no con los del negocio principal
+        $location_has_own_rut = ! empty($location_details->location_id)
+            && $location_details->location_id !== $business_details->tax_number_1;
+
+        // Nombre a mostrar como encabezado: si la sucursal tiene RUT propio, usar nombre de sucursal
+        $display_business_name = $location_has_own_rut
+            ? $location_details->name
+            : $business_details->name;
+
         $output = [
             'header_text' => isset($il->header_text) ? $il->header_text : '',
-            'business_name' => ($il->show_business_name == 1) ? $business_details->name : '',
+            // Si la sucursal tiene RUT propio, su nombre siempre aparece en la factura
+            // independientemente del flag show_business_name del layout
+            'business_name' => $location_has_own_rut
+                ? $location_details->name
+                : (($il->show_business_name == 1) ? $display_business_name : ''),
             'location_name' => ($il->show_location_name == 1) ? $location_details->name : '',
             'sub_heading_line1' => trim($il->sub_heading_line1),
             'sub_heading_line2' => trim($il->sub_heading_line2),
@@ -981,12 +995,19 @@ class TransactionUtil extends Util
         ];
 
         //Display name
-        $output['display_name'] = $output['business_name'];
-        if (! empty($output['location_name'])) {
-            if (! empty($output['display_name'])) {
-                $output['display_name'] .= ', ';
+        if ($location_has_own_rut) {
+            // La sucursal tiene identidad fiscal propia: mostrar siempre su nombre,
+            // independientemente de show_business_name / show_location_name del layout
+            $output['display_name'] = $location_details->name;
+        } else {
+            $output['display_name'] = $output['business_name'];
+            if (! empty($output['location_name'])) {
+                // Agrega el nombre de ubicación si no es ya el nombre principal
+                if (! empty($output['display_name'])) {
+                    $output['display_name'] .= ', ';
+                }
+                $output['display_name'] .= $output['location_name'];
             }
-            $output['display_name'] .= $output['location_name'];
         }
 
         //Codes
@@ -1007,7 +1028,13 @@ class TransactionUtil extends Util
         }
 
         //Logo
-        $output['logo'] = $il->show_logo != 0 && ! empty($il->logo) && file_exists(public_path('uploads/invoice_logos/'.$il->logo)) ? asset('uploads/invoice_logos/'.$il->logo) : false;
+        // Si la sucursal tiene logo propio (nombre de archivo en custom_field3), usarlo
+        $location_logo_file = ! empty($location_details->custom_field3) ? $location_details->custom_field3 : null;
+        if ($location_has_own_rut && ! empty($location_logo_file) && file_exists(public_path('uploads/invoice_logos/'.$location_logo_file))) {
+            $output['logo'] = asset('uploads/invoice_logos/'.$location_logo_file);
+        } else {
+            $output['logo'] = $il->show_logo != 0 && ! empty($il->logo) && file_exists(public_path('uploads/invoice_logos/'.$il->logo)) ? asset('uploads/invoice_logos/'.$il->logo) : false;
+        }
 
         //Address
         $output['address'] = '';
@@ -1052,10 +1079,16 @@ class TransactionUtil extends Util
         }
 
         //Tax Info
-        if ($il->show_tax_1 == 1 && ! empty($business_details->tax_number_1)) {
-            $output['tax_label1'] = ! empty($business_details->tax_label_1) ? $business_details->tax_label_1.': ' : '';
+        // Si la sucursal tiene un RUT propio en el campo location_id, usarlo en la factura
+        // en lugar del RUT del negocio principal
+        $tax_number_for_invoice = ! empty($location_details->location_id)
+            ? $location_details->location_id
+            : $business_details->tax_number_1;
+        $tax_label_for_invoice = ! empty($business_details->tax_label_1) ? $business_details->tax_label_1 : 'RUT';
 
-            $output['tax_info1'] = $business_details->tax_number_1;
+        if ($il->show_tax_1 == 1 && ! empty($tax_number_for_invoice)) {
+            $output['tax_label1'] = $tax_label_for_invoice.': ';
+            $output['tax_info1'] = $tax_number_for_invoice;
         }
         if ($il->show_tax_2 == 1 && ! empty($business_details->tax_number_2)) {
             if (! empty($output['tax_info1'])) {
@@ -1238,6 +1271,12 @@ class TransactionUtil extends Util
         } elseif ($transaction->status == 'draft' && $transaction->is_quotation == 1) {
             $output['invoice_heading'] = $il->quotation_heading;
             $output['invoice_no_prefix'] = $il->quotation_no_prefix;
+            //Use presupuesto_lista layout for unified quotations, presupuesto for normal
+            if ($transaction->sub_status == 'quotation_unified') {
+                $output['design'] = 'presupuesto_lista';
+            } else {
+                $output['design'] = 'presupuesto';
+            }
         } elseif ($transaction_type == 'sales_order') {
             $output['invoice_heading'] = ! empty($il->common_settings['sales_order_heading']) ? $il->common_settings['sales_order_heading'] : __('lang_v1.sales_order');
             $output['invoice_no_prefix'] = $il->quotation_no_prefix;
@@ -1586,6 +1625,29 @@ class TransactionUtil extends Util
         //Additional notes
         $output['additional_notes'] = $transaction->additional_notes;
         $output['footer_text'] = $invoice_layout->footer_text;
+
+        //Terms & conditions from staff_note (used in presupuesto layout)
+        $terms_text = $transaction->staff_note;
+        $terms_url = null;
+        //Extract URL if embedded in staff_note (format: "URL: https://...")
+        if (! empty($terms_text) && preg_match('/URL:\s*(https?:\/\/\S+)/i', $terms_text, $matches)) {
+            $terms_url = $matches[1];
+            $terms_text = trim(preg_replace('/\n*URL:\s*https?:\/\/\S+/i', '', $terms_text));
+        }
+        $output['terms_conditions'] = $terms_text;
+        $output['terms_url'] = $terms_url;
+
+        //Payment term info for presupuesto
+        $pay_term_text = '';
+        if (! empty($transaction->pay_term_type)) {
+            if ($transaction->pay_term_type == 'a_coordinar') {
+                $pay_term_text = 'A coordinar';
+            } elseif (! empty($transaction->pay_term_number)) {
+                $type_labels = ['months' => 'meses', 'days' => 'días'];
+                $pay_term_text = $transaction->pay_term_number . ' ' . ($type_labels[$transaction->pay_term_type] ?? $transaction->pay_term_type);
+            }
+        }
+        $output['pay_term'] = $pay_term_text;
 
         //Barcode related information.
         $output['show_barcode'] = ! empty($il->show_barcode) ? true : false;
@@ -1936,7 +1998,10 @@ class TransactionUtil extends Util
             $output['export_custom_fields_info']['export_custom_field_6'] = $export_custom_fields_info['export_custom_field_6'] ?? '';
         }
 
-        $output['design'] = $il->design;
+        //Only set design from invoice_layout if not already overridden (e.g. for quotations)
+        if (empty($output['design'])) {
+            $output['design'] = $il->design;
+        }
         $output['table_tax_headings'] = ! empty($il->table_tax_headings) ? array_filter(json_decode($il->table_tax_headings), 'strlen') : null;
 
         return (object) $output;
@@ -2112,9 +2177,12 @@ class TransactionUtil extends Util
             $line_array['line_discount_uf'] = method_exists($line, 'get_discount_amount') ? $line->get_discount_amount() : 0;
 
             if ($line->line_discount_type == 'percentage') {
-                $line_array['line_discount'] .= ' ('.$this->num_f($line->line_discount_amount, false, $business_details).'%)';
+                // Mostrar el porcentaje con hasta 6 decimales, quitando ceros innecesarios
+                $raw_pct = $line->line_discount_amount;
+                $formatted_pct = rtrim(rtrim(number_format($raw_pct, 6, '.', ''), '0'), '.');
+                $line_array['line_discount'] .= ' ('.$formatted_pct.'%)';
 
-                $line_array['line_discount_percent'] = $this->num_f($line->line_discount_amount, false, $business_details);
+                $line_array['line_discount_percent'] = $formatted_pct;
             }
 
             $line_array['total_line_discount'] = $this->num_f($line_array['line_discount_uf'] * $line_array['quantity_uf'], false, $business_details);
@@ -3818,6 +3886,12 @@ class TransactionUtil extends Util
         }
         if (empty($transaction)) {
             return false;
+        }
+
+        // Los presupuestos (quotation y quotation_unified) siempre se pueden editar
+        // independientemente del límite de días configurado
+        if (in_array($transaction->sub_status, ['quotation', 'quotation_unified'])) {
+            return true;
         }
 
         $date = \Carbon::parse($transaction->transaction_date)

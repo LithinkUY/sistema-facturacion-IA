@@ -332,12 +332,35 @@
     <div class="ticket">
         <!-- Encabezado con datos del emisor -->
         <div class="header">
-            @if($business->logo)
-                <img src="{{ asset('uploads/business_logos/' . $business->logo) }}" alt="Logo" class="logo">
+            @php
+                // Determinar si la sucursal tiene identidad fiscal propia
+                $location_has_own_rut = isset($location) && $location
+                    && !empty($location->location_id)
+                    && $location->location_id !== $business->tax_number_1;
+
+                // Nombre a mostrar: sucursal si tiene RUT propio, si no el negocio principal
+                $display_company_name = $location_has_own_rut ? $location->name : ($cfe->emitter_name ?? $business->name);
+
+                // Logo: custom_field3 de sucursal si tiene RUT propio y logo definido, si no logo del negocio
+                $location_logo_file = ($location_has_own_rut && !empty($location->custom_field3)
+                    && file_exists(public_path('uploads/invoice_logos/' . $location->custom_field3)))
+                    ? $location->custom_field3 : null;
+                $display_logo_url = $location_logo_file
+                    ? asset('uploads/invoice_logos/' . $location_logo_file)
+                    : ($location_has_own_rut ? null : ($business->logo ? asset('uploads/business_logos/' . $business->logo) : null));
+
+                // RUT a mostrar: emitter_rut del CFE → RUT propio de sucursal → RUT del negocio
+                $display_rut = $cfe->emitter_rut
+                    ?? ($location_has_own_rut ? $location->location_id : null)
+                    ?? $business->tax_number_1
+                    ?? '-';
+            @endphp
+            @if($display_logo_url)
+                <img src="{{ $display_logo_url }}" alt="Logo" class="logo">
             @endif
-            <div class="company-name">{{ $cfe->emitter_name ?? $business->name }}</div>
+            <div class="company-name">{{ $display_company_name }}</div>
             <div class="company-info">
-                RUT: {{ $cfe->emitter_rut ?? $business->tax_number_1 ?? '-' }}<br>
+                RUT: {{ $display_rut }}<br>
                 {{ $cfe->emitter_address ?: ($location->landmark ?? $location->name ?? '-') }}<br>
                 {{ $cfe->emitter_city ?? ($location->city ?? 'Montevideo') }}, {{ $cfe->emitter_department ?? ($location->state ?? 'Montevideo') }}<br>
                 @if($location && $location->mobile)Tel: {{ $location->mobile }}<br>@endif
@@ -460,6 +483,10 @@
             <div class="cae-info">
                 <strong>CAE:</strong><br>
                 <span class="cae-number">{{ $cfe->cae }}</span>
+            </div>
+            <div class="cae-info" style="margin-top: 3px;">
+                <strong>Vto. CAE:</strong>
+                <span>{{ $cfe->cae_due_date ? $cfe->cae_due_date->format('d/m/Y') : 'Pendiente' }}</span>
             </div>
             @endif
 

@@ -392,7 +392,12 @@ class AdminSidebarMenu
                             $sub->url(
                                 action([\App\Http\Controllers\SellController::class, 'create'], ['status' => 'quotation']),
                                 __('lang_v1.add_quotation'),
-                                ['icon' => '', 'active' => request()->get('status') == 'quotation']
+                                ['icon' => '', 'active' => request()->get('status') == 'quotation' && !request()->get('unified')]
+                            );
+                            $sub->url(
+                                action([\App\Http\Controllers\SellController::class, 'create'], ['status' => 'quotation', 'unified' => 1]),
+                                'Cotización Unificada',
+                                ['icon' => '', 'active' => request()->get('unified') == 1]
                             );
                         }
                         if (in_array('add_sale', $enabled_modules) && ($is_admin || auth()->user()->hasAnyPermission(['quotation.view_all', 'quotation.view_own']))) {
@@ -442,26 +447,7 @@ class AdminSidebarMenu
                             );
                         }
 
-                        // === Facturación Electrónica (CFE - DGI Uruguay) ===
-                        if ($is_admin || auth()->user()->hasAnyPermission(['sell.view', 'sell.create'])) {
-                            $sub->url(
-                                url('/cfe'),
-                                'Facturación Electrónica (CFE)',
-                                ['icon' => '', 'active' => request()->segment(1) == 'cfe' && request()->segment(2) == null]
-                            );
-                            $sub->url(
-                                url('/cfe/create'),
-                                'Nueva Factura/Ticket',
-                                ['icon' => '', 'active' => request()->segment(1) == 'cfe' && request()->segment(2) == 'create']
-                            );
-                            if ($is_admin || auth()->user()->can('business_settings.access')) {
-                                $sub->url(
-                                    url('/cfe/settings/index'),
-                                    'Configuración CFE',
-                                    ['icon' => '', 'active' => request()->segment(1) == 'cfe' && request()->segment(2) == 'settings']
-                                );
-                            }
-                        }
+
                     },
                     ['icon' => '<svg aria-hidden="true" class="tw-size-5 tw-shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
                     <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
@@ -471,6 +457,31 @@ class AdminSidebarMenu
                     <path d="M3 12a9 9 0 0 0 18 0"></path>
                   </svg>', 'id' => 'tour_step7']
                 )->order(30);
+            }
+
+            // === Facturas CFE (Facturación Electrónica DGI Uruguay) ===
+            if ($is_admin || auth()->user()->hasAnyPermission(['sell.view', 'sell.create'])) {
+                $menu->dropdown(
+                    'Facturas CFE',
+                    function ($sub) {
+                        $sub->url(
+                            url('/cfe'),
+                            'Listado de Facturas',
+                            ['icon' => '', 'active' => request()->segment(1) == 'cfe' && request()->segment(2) == null]
+                        );
+                        $sub->url(
+                            url('/cfe/create'),
+                            'Generar Factura',
+                            ['icon' => '', 'active' => request()->segment(1) == 'cfe' && request()->segment(2) == 'create']
+                        );
+                    },
+                    ['icon' => '<svg aria-hidden="true" class="tw-size-5 tw-shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                    <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                    <path d="M14 3v4a1 1 0 0 0 1 1h4"></path>
+                    <path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z"></path>
+                    <path d="M9 15l2 2l4 -4"></path>
+                  </svg>']
+                )->order(32);
             }
 
             //Stock transfer dropdown
@@ -821,6 +832,27 @@ class AdminSidebarMenu
               </svg>', 'active' => request()->segment(1) == 'backup'])->order(60);
             }
 
+            //Security Scanner menu
+            if ($is_admin) {
+                $menu->url(action([\App\Http\Controllers\SecurityScanController::class, 'index']), 'Seguridad', ['icon' => '<svg aria-hidden="true" class="tw-size-5 tw-shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                <path d="M12 3a12 12 0 0 0 8.5 3a12 12 0 0 1 -8.5 15a12 12 0 0 1 -8.5 -15a12 12 0 0 0 8.5 -3"></path>
+                <path d="M12 11m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"></path>
+                <path d="M12 12l0 2.5"></path>
+              </svg>', 'active' => request()->segment(1) == 'security'])->order(61);
+            }
+
+            //API Management menu
+            if ($is_admin) {
+                $menu->url(action([\App\Http\Controllers\ApiKeyController::class, 'index']), 'API REST', ['icon' => '<svg aria-hidden="true" class="tw-size-5 tw-shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                <path d="M4 13h5"></path>
+                <path d="M12 16v-8h3a2 2 0 0 1 2 2v1a2 2 0 0 1 -2 2h-3"></path>
+                <path d="M20 8v8"></path>
+                <path d="M9 16v-5.5a2.5 2.5 0 0 0 -5 0v5.5"></path>
+              </svg>', 'active' => request()->segment(1) == 'api-management'])->order(62);
+            }
+
             //Modules menu
             if (auth()->user()->can('manage_modules')) {
                 $menu->url(action([\App\Http\Controllers\Install\ModulesController::class, 'index']), __('lang_v1.modules'), ['icon' => '<svg aria-hidden="true" class="tw-size-5 tw-shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
@@ -880,7 +912,7 @@ class AdminSidebarMenu
                 auth()->user()->can('access_package_subscriptions')) {
                 $menu->dropdown(
                     __('business.settings'),
-                    function ($sub) use ($enabled_modules) {
+                    function ($sub) use ($enabled_modules, $is_admin) {
                         if (auth()->user()->can('business_settings.access')) {
                             $sub->url(
                                 action([\App\Http\Controllers\BusinessController::class, 'getBusinessSettings']),
@@ -944,6 +976,15 @@ class AdminSidebarMenu
                                 action([\App\Http\Controllers\TypesOfServiceController::class, 'index']),
                                 __('lang_v1.types_of_service'),
                                 ['icon' => '', 'active' => request()->segment(1) == 'types-of-service']
+                            );
+                        }
+
+                        // === Configuración CFE (Facturación Electrónica) ===
+                        if ($is_admin || auth()->user()->can('business_settings.access')) {
+                            $sub->url(
+                                url('/cfe/settings/index'),
+                                'Configuración CFE',
+                                ['icon' => '', 'active' => request()->segment(1) == 'cfe' && request()->segment(2) == 'settings']
                             );
                         }
                     },

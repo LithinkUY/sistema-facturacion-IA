@@ -6,6 +6,9 @@
     <h1 class="tw-text-xl md:tw-text-3xl tw-font-bold tw-text-black">
         <i class="fas fa-file-invoice"></i> Detalle CFE {{ $cfe_types[$cfe->cfe_type] ?? $cfe->cfe_type }}
         <small>{{ $cfe->series }}-{{ str_pad($cfe->number, 7, '0', STR_PAD_LEFT) }}</small>
+        <a href="{{ route('cfe.edit', $cfe->id) }}" class="btn btn-warning btn-sm pull-right" style="margin-top:5px;">
+            <i class="fas fa-edit"></i> Editar CFE
+        </a>
     </h1>
 </section>
 
@@ -168,6 +171,17 @@
                         <td><code>{{ $cfe->cae }}</code></td>
                     </tr>
                     @endif
+                    @if($cfe->cae_due_date)
+                    <tr>
+                        <th>Vto. CAE:</th>
+                        <td><strong>{{ $cfe->cae_due_date->format('d/m/Y') }}</strong></td>
+                    </tr>
+                    @else
+                    <tr>
+                        <th>Vto. CAE:</th>
+                        <td><span class="text-muted">Pendiente</span></td>
+                    </tr>
+                    @endif
                     @if($cfe->track_id)
                     <tr>
                         <th>Track ID:</th>
@@ -202,6 +216,46 @@
                     </ul>
                 </div>
                 @endif
+
+                {{-- Formulario para actualizar CAE manualmente --}}
+                @if($cfe->cae || in_array($cfe->status, ['accepted', 'submitted']))
+                <div class="panel panel-default" style="margin-top:10px;">
+                    <div class="panel-heading">
+                        <a data-toggle="collapse" href="#updateCaeForm" style="color:inherit;">
+                            <i class="fas fa-edit"></i> Actualizar datos CAE manualmente
+                        </a>
+                    </div>
+                    <div id="updateCaeForm" class="panel-collapse collapse">
+                        <div class="panel-body">
+                            <div class="row">
+                                <div class="col-md-5">
+                                    <div class="form-group">
+                                        <label>Número CAE</label>
+                                        <input type="text" id="input_cae" class="form-control" 
+                                               value="{{ $cfe->cae }}" placeholder="Número CAE">
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="form-group">
+                                        <label>Fecha Venc. CAE</label>
+                                        <input type="date" id="input_cae_due_date" class="form-control"
+                                               value="{{ $cfe->cae_due_date ? $cfe->cae_due_date->format('Y-m-d') : '' }}">
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="form-group">
+                                        <label>&nbsp;</label>
+                                        <button class="btn btn-primary btn-block" id="btn_update_cae" 
+                                                data-id="{{ $cfe->id }}">
+                                            <i class="fas fa-save"></i> Guardar
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                @endif
             @endcomponent
 
             {{-- Código QR --}}
@@ -230,6 +284,33 @@ $(document).ready(function() {
     qr.make();
     document.getElementById('qrcode').innerHTML = qr.createImgTag(4);
     @endif
+
+    // Actualizar CAE manualmente
+    $(document).on('click', '#btn_update_cae', function() {
+        var cfe_id = $(this).data('id');
+        var cae = $('#input_cae').val();
+        var cae_due_date = $('#input_cae_due_date').val();
+
+        $.ajax({
+            url: '/cfe/' + cfe_id + '/update-cae',
+            type: 'POST',
+            headers: {
+                'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+            },
+            data: { cae: cae, cae_due_date: cae_due_date },
+            success: function(response) {
+                if (response.success) {
+                    toastr.success(response.msg);
+                    setTimeout(function(){ location.reload(); }, 1000);
+                } else {
+                    toastr.error(response.msg || 'Error al actualizar');
+                }
+            },
+            error: function() {
+                toastr.error('Error al actualizar CAE');
+            }
+        });
+    });
 
     // Reenviar CFE
     $(document).on('click', '.resend-cfe', function(e) {

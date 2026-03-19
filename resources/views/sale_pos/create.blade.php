@@ -87,6 +87,47 @@
     <!-- quick product modal -->
     <div class="modal fade quick_add_product_modal" tabindex="-1" role="dialog" aria-labelledby="modalTitle"></div>
 
+    <!-- modal producto manual -->
+    <div class="modal fade" id="manual_product_modal" tabindex="-1" role="dialog" aria-labelledby="manualProductModalTitle">
+      <div class="modal-dialog" role="document">
+        <div class="modal-content">
+          <div class="modal-header">
+            <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+            <h4 class="modal-title" id="manualProductModalTitle"><i class="fa fa-keyboard-o"></i> Agregar Producto Manual</h4>
+          </div>
+          <div class="modal-body">
+            <p class="text-muted" style="margin-bottom:15px;"><small>El producto se crea en el catálogo automáticamente sin gestión de stock.</small></p>
+            <div class="form-group">
+              <label>Nombre del producto: <span class="text-danger">*</span></label>
+              <input type="text" id="manual_product_name" class="form-control" placeholder="Ej: Servicio de instalación" autofocus>
+            </div>
+            <div class="row">
+              <div class="col-sm-6">
+                <div class="form-group">
+                  <label>Precio unitario (inc. imp.): <span class="text-danger">*</span></label>
+                  <input type="number" id="manual_product_price" class="form-control" placeholder="0.00" min="0" step="0.01">
+                </div>
+              </div>
+              <div class="col-sm-6">
+                <div class="form-group">
+                  <label>Cantidad:</label>
+                  <input type="number" id="manual_product_qty" class="form-control" value="1" min="1" step="1">
+                </div>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Descuento %:</label>
+              <input type="number" id="manual_product_discount" class="form-control" value="0" min="0" max="100" step="0.01">
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="tw-dw-btn tw-dw-btn-primary tw-text-white" id="save_manual_product"><i class="fa fa-check"></i> Agregar al carrito</button>
+            <button type="button" class="tw-dw-btn tw-dw-btn-neutral tw-text-white" data-dismiss="modal">Cancelar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="modal fade" id="expense_modal" tabindex="-1" role="dialog" aria-labelledby="gridSystemModalLabel">
     </div>
 

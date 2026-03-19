@@ -4,6 +4,8 @@ $(document).ready(function() {
 
     $('select#select_location_id').change(function() {
         var location_id = $(this).val();
+        // Update hidden location_id so other flows use selected location
+        $('input#location_id').val(location_id);
         getLocationTables(location_id);
     });
 

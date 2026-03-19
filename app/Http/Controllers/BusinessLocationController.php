@@ -278,6 +278,14 @@ class BusinessLocationController extends Controller
 
             $input['featured_products'] = ! empty($input['featured_products']) ? json_encode($input['featured_products']) : null;
 
+            // Subida de logo propio para la sucursal (se guarda el nombre en custom_field3)
+            if ($request->hasFile('location_logo')) {
+                $file = $request->file('location_logo');
+                $filename = 'location_'.$id.'_'.time().'.'.$file->getClientOriginalExtension();
+                $file->move(public_path('uploads/invoice_logos'), $filename);
+                $input['custom_field3'] = $filename;
+            }
+
             BusinessLocation::where('business_id', $business_id)
                             ->where('id', $id)
                             ->update($input);
