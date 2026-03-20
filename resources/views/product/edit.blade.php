@@ -359,6 +359,12 @@
             </div>
     @endcomponent
 
+    @can('product.opening_stock')
+    <div id="opening_stock_section" @if(empty($product->enable_stock)) style="display:none" @endif>
+        @include('product.partials.edit_product_opening_stock', ['locations' => $locations, 'opening_stock_data' => $opening_stock_data ?? []])
+    </div>
+    @endcan
+
   <div class="row">
     <input type="hidden" name="submit_type" id="submit_type">
         <div class="col-sm-12">
@@ -366,10 +372,6 @@
             <div class="btn-group">
               @if($selling_price_group_count)
                 <button type="submit" value="submit_n_add_selling_prices" class="tw-dw-btn tw-dw-btn-warning tw-text-white tw-dw-btn-lg submit_product_form">@lang('lang_v1.save_n_add_selling_price_group_prices')</button>
-              @endif
-
-              @can('product.opening_stock')
-              <button type="submit" @if(empty($product->enable_stock)) disabled="true" @endif id="opening_stock_button"  value="update_n_edit_opening_stock" class="tw-dw-btn tw-text-white tw-dw-btn-lg bg-purple submit_product_form">@lang('lang_v1.update_n_edit_opening_stock')</button>
               @endif
 
               <button type="submit" value="save_n_add_another" class="tw-dw-btn tw-text-white tw-dw-btn-lg bg-maroon submit_product_form">@lang('lang_v1.update_n_add_another')</button>
@@ -387,6 +389,7 @@
 
 @section('javascript')
   <script src="{{ asset('js/product.js?v=' . $asset_v) }}"></script>
+  <script src="{{ asset('js/opening_stock.js?v=' . $asset_v) }}"></script>
   <script type="text/javascript">
     $(document).ready( function(){
       __page_leave_confirmation('#product_add_form');

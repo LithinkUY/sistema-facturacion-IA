@@ -27,6 +27,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Yajra\DataTables\Facades\DataTables;
 use App\Events\ProductsCreatedOrModified;
+use App\Transaction;
 use App\TransactionSellLine;
 
 class ProductController extends Controller
@@ -673,8 +674,33 @@ class ProductController extends Controller
 
         $alert_quantity = ! is_null($product->alert_quantity) ? $this->productUtil->num_f($product->alert_quantity, false, null, true) : null;
 
+        // Opening stock inline data
+        $locations = BusinessLocation::forDropdown($business_id);
+        $enable_expiry = request()->session()->get('business.enable_product_expiry');
+        $enable_lot = request()->session()->get('business.enable_lot_number');
+
+        // Get existing opening stock data
+        $opening_stock_data = [];
+        if ($product->enable_stock == 1) {
+            $os_transactions = Transaction::where('business_id', $business_id)
+                ->where('opening_stock_product_id', $product->id)
+                ->where('type', 'opening_stock')
+                ->with(['purchase_lines'])
+                ->get();
+            foreach ($os_transactions as $os_txn) {
+                foreach ($os_txn->purchase_lines as $pl) {
+                    $opening_stock_data[$os_txn->location_id] = [
+                        'quantity' => $pl->quantity_remaining,
+                        'purchase_price' => $pl->purchase_price,
+                        'exp_date' => $pl->exp_date,
+                        'lot_number' => $pl->lot_number,
+                    ];
+                }
+            }
+        }
+
         return view('product.edit')
-                ->with(compact('categories', 'brands', 'units', 'sub_units', 'taxes', 'tax_attributes', 'barcode_types', 'product', 'sub_categories', 'default_profit_percent', 'business_locations', 'rack_details', 'selling_price_group_count', 'module_form_parts', 'product_types', 'common_settings', 'warranties', 'pos_module_data', 'alert_quantity'));
+                ->with(compact('categories', 'brands', 'units', 'sub_units', 'taxes', 'tax_attributes', 'barcode_types', 'product', 'sub_categories', 'default_profit_percent', 'business_locations', 'rack_details', 'selling_price_group_count', 'module_form_parts', 'product_types', 'common_settings', 'warranties', 'pos_module_data', 'alert_quantity', 'locations', 'enable_expiry', 'enable_lot', 'opening_stock_data'));
     }
 
     /**
@@ -886,6 +912,14 @@ class ProductController extends Controller
             }
 
             Media::uploadMedia($product->business_id, $product, $request, 'product_brochure', true);
+
+            // Process inline opening stock (from edit form)
+            if ($product->enable_stock == 1 && ! empty($request->input('opening_stock'))) {
+                $user_id = $request->session()->get('user.id');
+                $transaction_date = $request->session()->get('financial_year.start');
+                $transaction_date = \Carbon::createFromFormat('Y-m-d', $transaction_date)->toDateTimeString();
+                $this->productUtil->addSingleProductOpeningStock($business_id, $product, $request->input('opening_stock'), $transaction_date, $user_id);
+            }
 
             DB::commit();
             $output = ['success' => 1,
