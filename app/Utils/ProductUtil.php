@@ -1123,6 +1123,15 @@ class ProductUtil extends Util
         $tax_percent = ! empty($product->product_tax->amount) ? $product->product_tax->amount : 0;
         $tax_id = ! empty($product->product_tax->id) ? $product->product_tax->id : null;
 
+        // Get a valid contact_id for the transaction (required by FK constraint)
+        $contact_id = \App\Contact::where('business_id', $business_id)
+            ->where('type', 'supplier')
+            ->first()->id ?? null;
+        if (empty($contact_id)) {
+            // Fallback: use any contact from the business
+            $contact_id = \App\Contact::where('business_id', $business_id)->first()->id ?? null;
+        }
+
         foreach ($input as $key => $value) {
             $location_id = $key;
             $purchase_total = 0;
@@ -1181,6 +1190,7 @@ class ProductUtil extends Util
                             'final_total' => $purchase_total,
                             'payment_status' => 'paid',
                             'created_by' => $user_id,
+                            'contact_id' => $contact_id,
                         ]
               );
                     $transaction->purchase_lines()->saveMany($purchase_lines);

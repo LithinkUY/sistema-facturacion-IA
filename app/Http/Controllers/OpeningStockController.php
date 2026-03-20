@@ -162,6 +162,14 @@ class OpeningStockController extends Controller
                 $tax_percent = ! empty($product->product_tax->amount) ? $product->product_tax->amount : 0;
                 $tax_id = ! empty($product->product_tax->id) ? $product->product_tax->id : null;
 
+                // Get a valid contact_id for the transaction (required by FK constraint)
+                $contact_id = \App\Contact::where('business_id', $business_id)
+                    ->where('type', 'supplier')
+                    ->first()->id ?? null;
+                if (empty($contact_id)) {
+                    $contact_id = \App\Contact::where('business_id', $business_id)->first()->id ?? null;
+                }
+
                 //Get start date for financial year.
                 $transaction_date = request()->session()->get('financial_year.start');
                 $transaction_date = \Carbon::createFromFormat('Y-m-d', $transaction_date)->toDateTimeString();
@@ -353,6 +361,7 @@ class OpeningStockController extends Controller
                                         'final_total' => $new_purchase_line->purchase_price_inc_tax * $new_purchase_line->quantity,
                                         'payment_status' => 'paid',
                                         'created_by' => $user_id,
+                                        'contact_id' => $contact_id,
                                     ]
                                 );
 
