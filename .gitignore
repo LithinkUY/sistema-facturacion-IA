@@ -29,6 +29,8 @@
 /xampp/
 /backup_old_project/
 /Upload/
+*.sql
+*.zip
 
 # ===========================
 # Archivos temporales debug/fix

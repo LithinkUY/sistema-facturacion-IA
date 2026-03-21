@@ -6,13 +6,9 @@ use App\Services\Cfe\CFEService;
 use App\Services\Cfe\CFEXmlGenerator;
 use App\Services\Cfe\RutService;
 use App\Transaction;
-use App\TransactionSellLine;
-use App\TransactionPayment;
-use App\VariationLocationDetails;
 use App\Business;
 use App\Contact;
 use App\CfeSubmission;
-use App\Utils\TransactionUtil;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -29,7 +25,6 @@ class CFEController extends Controller
     protected CFEService $cfeService;
     protected CFEXmlGenerator $xmlGenerator;
     protected RutService $rutService;
-    protected TransactionUtil $transactionUtil;
 
     // Tipos de CFE según DGI Uruguay
     public const CFE_TYPES = [
@@ -87,13 +82,11 @@ class CFEController extends Controller
     public function __construct(
         CFEService $cfeService,
         CFEXmlGenerator $xmlGenerator,
-        RutService $rutService,
-        TransactionUtil $transactionUtil
+        RutService $rutService
     ) {
         $this->cfeService = $cfeService;
         $this->xmlGenerator = $xmlGenerator;
         $this->rutService = $rutService;
-        $this->transactionUtil = $transactionUtil;
     }
 
     /**
@@ -408,18 +401,6 @@ class CFEController extends Controller
             $cfe->xml_content = $xmlContent;
             $cfe->save();
 
-            // ── Crear Transaction de venta vinculada al CFE ──────────────
-            // Solo para tipos de venta (no notas de crédito/débito/remitos)
-            $cfe_sale_types = [101, 111, 121, 131, 141];
-            if (in_array((int)$request->cfe_type, $cfe_sale_types)) {
-                $transaction = $this->createTransactionFromCFE($cfe, $business, $items, $subtotal, $tax_amount, $total, $user_id, $business_id);
-                if ($transaction) {
-                    $cfe->transaction_id = $transaction->id;
-                    $cfe->save();
-                }
-            }
-            // ─────────────────────────────────────────────────────────────
-
             // Si está configurado auto_submit, enviar a DGI
             if (config('cfe.auto_submit', false)) {
                 $result = $this->submitToDGI($cfe);
@@ -451,176 +432,6 @@ class CFEController extends Controller
         }
 
         return response()->json($output);
-    }
-
-    /**
-     * Crea una Transaction de venta vinculada a un CFE.
-     * Esto permite que el CFE aparezca en el dashboard, informes de ventas
-     * y descuente el stock de los productos correctamente.
-     *
-     * @param  CfeSubmission  $cfe
-     * @param  Business       $business
-     * @param  array          $items        ítems ya calculados del CFE
-     * @param  float          $subtotal
-     * @param  float          $tax_amount
-     * @param  float          $total
-     * @param  int            $user_id
-     * @param  int            $business_id
-     * @return Transaction|null
-     */
-    private function createTransactionFromCFE(
-        CfeSubmission $cfe,
-        Business $business,
-        array $items,
-        float $subtotal,
-        float $tax_amount,
-        float $total,
-        int $user_id,
-        int $business_id
-    ): ?Transaction {
-        try {
-            // Obtener número de factura del esquema configurado
-            $invoice_no = $this->transactionUtil->getInvoiceNumber(
-                $business_id,
-                'final',
-                $cfe->location_id
-            );
-
-            // Mapeo de forma de pago CFE → método de pago del sistema
-            $payment_method_map = [
-                1 => 'cash',        // Contado
-                2 => 'credit',      // Crédito
-                3 => 'cash',        // Contra Entrega
-                4 => 'cheque',      // Cheque
-                5 => 'bank_transfer', // Transferencia
-                6 => 'card',        // Tarjeta débito
-                7 => 'card',        // Tarjeta crédito
-                8 => 'custom_pay_1', // Mercado Pago
-                9 => 'other',       // Otro
-            ];
-            $pay_method = $payment_method_map[$cfe->payment_method] ?? 'cash';
-
-            // Determinar contact_id: usar el del CFE si existe, sino buscar "Consumidor Final"
-            $contact_id = $cfe->contact_id;
-            if (empty($contact_id)) {
-                $walk_in = \App\Contact::where('business_id', $business_id)
-                    ->where('type', 'customer')
-                    ->where('is_default', 1)
-                    ->first();
-                $contact_id = $walk_in ? $walk_in->id : \App\Contact::where('business_id', $business_id)
-                    ->where('type', 'customer')
-                    ->value('id');
-            }
-
-            // Crear la transacción
-            $transaction = Transaction::create([
-                'business_id'         => $business_id,
-                'location_id'         => $cfe->location_id,
-                'type'                => 'sell',
-                'status'              => 'final',
-                'payment_status'      => 'paid',
-                'contact_id'          => $contact_id,
-                'invoice_no'          => $invoice_no,
-                'transaction_date'    => $cfe->issue_date ?? Carbon::now(),
-                'total_before_tax'    => $subtotal,
-                'tax_amount'          => $tax_amount,
-                'final_total'         => $total,
-                'discount_type'       => 'fixed',
-                'discount_amount'     => 0,
-                'created_by'          => $user_id,
-                'shipping_charges'    => 0,
-                'additional_notes'    => 'CFE #' . $cfe->series . '-' . $cfe->number . ' (' . ($cfe->receiver_name ?: 'Consumidor Final') . ')',
-            ]);
-
-            // ── Crear líneas de venta y descontar stock ──────────────────
-            foreach ($items as $item) {
-                $product_id   = !empty($item['product_id']) ? (int)$item['product_id'] : null;
-                $variation_id = null;
-
-                if ($product_id) {
-                    // Buscar la variación "DUMMY" (variante única / producto simple)
-                    $variation = \App\Variation::where('product_id', $product_id)->first();
-                    $variation_id = $variation ? $variation->id : null;
-                }
-
-                $qty        = (float) $item['quantity'];
-                $unit_price = (float) $item['unit_price'];
-                $iva_rate   = (float) ($item['iva_rate'] ?? 22);
-                $item_tax   = $unit_price * ($iva_rate / 100);
-                $unit_price_inc_tax = $unit_price + $item_tax;
-
-                // Buscar tax_id que coincida con la tasa de IVA configurada
-                $tax_id = null;
-                if ($iva_rate > 0) {
-                    $tax = \App\TaxRate::where('business_id', $business_id)
-                        ->where('amount', $iva_rate)
-                        ->where('is_tax_group', 0)
-                        ->first();
-                    $tax_id = $tax ? $tax->id : null;
-                }
-
-                $sell_line = TransactionSellLine::create([
-                    'transaction_id'          => $transaction->id,
-                    'product_id'              => $product_id,
-                    'variation_id'            => $variation_id,
-                    'quantity'                => $qty,
-                    'unit_price_before_discount' => $unit_price,
-                    'unit_price'              => $unit_price,
-                    'line_discount_type'      => 'fixed',
-                    'line_discount_amount'    => 0,
-                    'item_tax'                => $item_tax,
-                    'tax_id'                  => $tax_id,
-                    'unit_price_inc_tax'      => $unit_price_inc_tax,
-                    'sell_line_note'          => $item['name'] ?? '',
-                    'quantity_returned'       => 0,
-                    'sub_unit_id'             => null,
-                ]);
-
-                // Descontar stock si el producto tiene control de inventario
-                if ($product_id && $variation_id) {
-                    $product = \App\Product::find($product_id);
-                    if ($product && $product->enable_stock == 1) {
-                        VariationLocationDetails::where('variation_id', $variation_id)
-                            ->where('product_id', $product_id)
-                            ->where('location_id', $cfe->location_id)
-                            ->decrement('qty_available', $qty);
-                    }
-                }
-            }
-
-            // ── Registrar el pago ─────────────────────────────────────────
-            // Solo si la forma de pago es contado (no crédito)
-            if ($cfe->payment_method != 2) {
-                TransactionPayment::create([
-                    'transaction_id'  => $transaction->id,
-                    'amount'          => $total,
-                    'method'          => $pay_method,
-                    'is_return'       => 0,
-                    'paid_on'         => $cfe->issue_date ?? Carbon::now(),
-                    'created_by'      => $user_id,
-                    'business_id'     => $business_id,
-                    'payment_for'     => $contact_id,
-                    'payment_ref_no'  => 'CFE-' . $cfe->series . $cfe->number,
-                ]);
-            }
-
-            Log::info('Transaction creada desde CFE', [
-                'cfe_id'         => $cfe->id,
-                'transaction_id' => $transaction->id,
-                'total'          => $total,
-            ]);
-
-            return $transaction;
-
-        } catch (\Exception $e) {
-            Log::error('Error al crear Transaction desde CFE', [
-                'cfe_id'  => $cfe->id,
-                'message' => $e->getMessage(),
-                'trace'   => $e->getTraceAsString(),
-            ]);
-            // No lanzamos excepción para no cancelar la creación del CFE
-            return null;
-        }
     }
 
     /**

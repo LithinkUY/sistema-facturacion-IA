@@ -47,7 +47,7 @@
 					
 
 					<button type="button" class="btn btn-default bg-white btn-flat pos_add_quick_product" data-href="{{action([\App\Http\Controllers\ProductController::class, 'quickAdd'])}}" data-container=".quick_add_product_modal"><i class="fa fa-plus-circle text-primary fa-lg"></i></button>
-					<button type="button" class="btn btn-default bg-white btn-flat" id="btn_add_manual_product" title="@lang('lang_v1.add_product') manual"><i class="fa fa-keyboard-o text-warning fa-lg"></i></button>
+					<button type="button" class="btn btn-default bg-white btn-flat" id="btn_add_manual_product" title="@lang('lang_v1.add_product') manual" style="border: 1px solid #f0ad4e;"><i class="fas fa-pencil-alt text-warning fa-lg"></i></button>
 				</span>
 			</div>
 		</div>
