@@ -2361,6 +2361,9 @@ function round_row_to_iraqi_dinnar(row) {
     }
 }
 
+// Variable global para almacenar el último receipt
+var _last_pos_receipt = null;
+
 function pos_print(receipt) {
     //If printer type then connect with websocket
     if (receipt.print_type == 'printer') {
@@ -2378,19 +2381,85 @@ function pos_print(receipt) {
         }
 
     } else if (receipt.html_content != '') {
-        var title = document.title;
-        if (typeof receipt.print_title != 'undefined') {
-            document.title = receipt.print_title;
+        // Guardar receipt para uso posterior
+        _last_pos_receipt = receipt;
+
+        // Mostrar modal de selección de formato si existe
+        if ($('#print_format_modal').length > 0) {
+            $('#print_format_modal').modal('show');
+        } else {
+            // Fallback: imprimir directo como ticket
+            _do_pos_print(receipt.html_content, receipt.print_title);
         }
+    }
+}
 
-        //If printer type browser then print content
-        $('#receipt_section').html(receipt.html_content);
-        __currency_convert_recursively($('#receipt_section'));
-        __print_receipt('receipt_section');
+function _do_pos_print(html_content, print_title) {
+    var title = document.title;
+    if (typeof print_title != 'undefined' && print_title) {
+        document.title = print_title;
+    }
 
-        setTimeout(function() {
-            document.title = title;
-        }, 1200);
+    $('#receipt_section').html(html_content);
+    __currency_convert_recursively($('#receipt_section'));
+    __print_receipt('receipt_section');
+
+    setTimeout(function() {
+        document.title = title;
+    }, 1200);
+}
+
+// Imprimir como ticket (formato CFE 80mm)
+function pos_print_ticket() {
+    $('#print_format_modal').modal('hide');
+    if (_last_pos_receipt && _last_pos_receipt.html_content) {
+        // Pedir la versión ticket al servidor
+        if (_last_pos_receipt.transaction_id) {
+            $.ajax({
+                method: 'GET',
+                url: '/sells/' + _last_pos_receipt.transaction_id + '/print',
+                data: { format: 'cfe_ticket' },
+                dataType: 'json',
+                success: function(result) {
+                    if (result.success == 1 && result.receipt && result.receipt.html_content) {
+                        _do_pos_print(result.receipt.html_content, result.receipt.print_title);
+                    } else {
+                        // Fallback al contenido original
+                        _do_pos_print(_last_pos_receipt.html_content, _last_pos_receipt.print_title);
+                    }
+                },
+                error: function() {
+                    _do_pos_print(_last_pos_receipt.html_content, _last_pos_receipt.print_title);
+                }
+            });
+        } else {
+            _do_pos_print(_last_pos_receipt.html_content, _last_pos_receipt.print_title);
+        }
+    }
+}
+
+// Imprimir como factura A4 (formato CFE DGI)
+function pos_print_a4() {
+    $('#print_format_modal').modal('hide');
+    if (_last_pos_receipt && _last_pos_receipt.transaction_id) {
+        $.ajax({
+            method: 'GET',
+            url: '/sells/' + _last_pos_receipt.transaction_id + '/print',
+            data: { format: 'cfe_a4' },
+            dataType: 'json',
+            success: function(result) {
+                if (result.success == 1 && result.receipt && result.receipt.html_content) {
+                    _do_pos_print(result.receipt.html_content, result.receipt.print_title);
+                } else {
+                    toastr.error('No se pudo generar la factura A4');
+                }
+            },
+            error: function() {
+                toastr.error('Error al generar la factura A4');
+            }
+        });
+    } else if (_last_pos_receipt) {
+        _do_pos_print(_last_pos_receipt.html_content, _last_pos_receipt.print_title);
     }
 }
 

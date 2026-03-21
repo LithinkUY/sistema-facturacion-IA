@@ -754,13 +754,15 @@ class SellPosController extends Controller
         $is_package_slip = false,
         $from_pos_screen = true,
         $invoice_layout_id = null,
-        $is_delivery_note = false
+        $is_delivery_note = false,
+        $receipt_format = null
     ) {
         $output = ['is_enabled' => false,
             'print_type' => 'browser',
             'html_content' => null,
             'printer_config' => [],
             'data' => [],
+            'transaction_id' => $transaction_id,
         ];
 
         $business_details = $this->businessUtil->getDetails($business_id);
@@ -812,7 +814,13 @@ class SellPosController extends Controller
                 $receipt_details->design = 'presupuesto_lista';
             }
 
-            $layout = !empty($receipt_details->design) ? 'sale_pos.receipts.' . $receipt_details->design : 'sale_pos.receipts.classic';
+            // Si se especifica un formato de recibo personalizado (cfe_ticket, cfe_a4), usarlo
+            $forced_format = $receipt_format ?: request()->input('format');
+            if (in_array($forced_format, ['cfe_ticket', 'cfe_a4'])) {
+                $layout = 'sale_pos.receipts.' . $forced_format;
+            } else {
+                $layout = !empty($receipt_details->design) ? 'sale_pos.receipts.' . $receipt_details->design : 'sale_pos.receipts.classic';
+            }
 
             $output['html_content'] = view($layout, compact('receipt_details'))->render();
         }
@@ -2000,7 +2008,8 @@ class SellPosController extends Controller
                 $is_delivery_note = !empty($request->input('delivery_note')) ? true : false;
 
                 $invoice_layout_id = $transaction->is_direct_sale ? $transaction->location->sale_invoice_layout_id : null;
-                $receipt = $this->receiptContent($business_id, $transaction->location_id, $transaction_id, $printer_type, $is_package_slip, false, $invoice_layout_id, $is_delivery_note);
+                $receipt_format = $request->input('format');
+                $receipt = $this->receiptContent($business_id, $transaction->location_id, $transaction_id, $printer_type, $is_package_slip, false, $invoice_layout_id, $is_delivery_note, $receipt_format);
 
                 if (!empty($receipt)) {
                     $output = ['success' => 1, 'receipt' => $receipt];

@@ -73,6 +73,37 @@
     <!-- This will be printed -->
     <section class="invoice print_section" id="receipt_section">
     </section>
+
+    <!-- Modal de selección de formato de impresión -->
+    <div class="modal fade" id="print_format_modal" tabindex="-1" role="dialog" aria-labelledby="printFormatModalLabel">
+        <div class="modal-dialog modal-sm" role="document" style="margin-top: 15%;">
+            <div class="modal-content">
+                <div class="modal-header" style="background: #3c8dbc; color: #fff; padding: 10px 15px;">
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close" style="color:#fff; opacity:1;">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                    <h4 class="modal-title" id="printFormatModalLabel">
+                        <i class="fas fa-print"></i> Seleccionar formato de impresión
+                    </h4>
+                </div>
+                <div class="modal-body text-center" style="padding: 25px;">
+                    <p style="margin-bottom: 20px; color: #555;">¿Cómo desea imprimir el comprobante?</p>
+                    <button type="button" class="btn btn-primary btn-lg btn-block" onclick="pos_print_ticket()" style="margin-bottom: 12px; padding: 12px; font-size: 16px;">
+                        <i class="fas fa-receipt"></i> &nbsp; Ticket (80mm)
+                    </button>
+                    <button type="button" class="btn btn-success btn-lg btn-block" onclick="pos_print_a4()" style="padding: 12px; font-size: 16px;">
+                        <i class="fas fa-file-invoice"></i> &nbsp; Factura A4
+                    </button>
+                </div>
+                <div class="modal-footer" style="padding: 8px 15px;">
+                    <button type="button" class="btn btn-default btn-sm" data-dismiss="modal">
+                        <i class="fas fa-times"></i> Cancelar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="modal fade contact_modal" tabindex="-1" role="dialog" aria-labelledby="gridSystemModalLabel">
         @include('contact.create', ['quick_add' => true])
     </div>
