@@ -958,11 +958,24 @@
           <label for="manual_product_name">Nombre del producto / servicio: *</label>
           <input type="text" class="form-control" id="manual_product_name" placeholder="Ej: Servicio de reparación" required>
         </div>
-        <div class="form-group">
-          <label for="manual_product_price">Precio de venta: *</label>
-          <div class="input-group">
-            <span class="input-group-addon"><i class="fas fa-money-bill-alt"></i></span>
-            <input type="text" class="form-control input_number" id="manual_product_price" placeholder="0.00" required>
+        <div class="row">
+          <div class="col-sm-6">
+            <div class="form-group">
+              <label for="manual_product_price">Precio de venta: *</label>
+              <div class="input-group">
+                <span class="input-group-addon"><i class="fas fa-money-bill-alt"></i></span>
+                <input type="text" class="form-control input_number" id="manual_product_price" placeholder="0.00" required>
+              </div>
+            </div>
+          </div>
+          <div class="col-sm-6">
+            <div class="form-group">
+              <label for="manual_product_stock">Stock inicial:</label>
+              <div class="input-group">
+                <span class="input-group-addon"><i class="fas fa-cubes"></i></span>
+                <input type="number" class="form-control" id="manual_product_stock" value="100" min="0" step="1">
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -1066,6 +1079,7 @@
 			$('#btn_manual_product').click(function() {
 				$('#manual_product_name').val('');
 				$('#manual_product_price').val('');
+				$('#manual_product_stock').val(100);
 				$('#manual_product_modal').modal('show');
 				setTimeout(function() { $('#manual_product_name').focus(); }, 500);
 			});
@@ -1073,6 +1087,7 @@
 			$('#btn_save_manual_product').click(function() {
 				var name = $('#manual_product_name').val().trim();
 				var price = $('#manual_product_price').val().trim();
+				var stock_quantity = parseInt($('#manual_product_stock').val()) || 0;
 
 				if (!name) {
 					toastr.error('Ingrese el nombre del producto');
@@ -1104,6 +1119,7 @@
 					data: {
 						name: name,
 						selling_price: price,
+						stock_quantity: stock_quantity,
 						location_id: location_id,
 						_token: $('input[name=_token]').first().val()
 					},

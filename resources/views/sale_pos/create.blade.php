@@ -127,22 +127,31 @@
             <h4 class="modal-title" id="manualProductModalTitle"><i class="fa fa-keyboard-o"></i> Agregar Producto Manual</h4>
           </div>
           <div class="modal-body">
-            <p class="text-muted" style="margin-bottom:15px;"><small>El producto se crea en el catálogo automáticamente sin gestión de stock.</small></p>
+            <p class="text-muted" style="margin-bottom:15px;"><small>El producto se crea en el catálogo automáticamente.</small></p>
             <div class="form-group">
               <label>Nombre del producto: <span class="text-danger">*</span></label>
               <input type="text" id="manual_product_name" class="form-control" placeholder="Ej: Servicio de instalación" autofocus>
             </div>
             <div class="row">
-              <div class="col-sm-6">
+              <div class="col-sm-4">
                 <div class="form-group">
-                  <label>Precio unitario (inc. imp.): <span class="text-danger">*</span></label>
+                  <label>Precio unitario: <span class="text-danger">*</span></label>
                   <input type="number" id="manual_product_price" class="form-control" placeholder="0.00" min="0" step="0.01">
                 </div>
               </div>
-              <div class="col-sm-6">
+              <div class="col-sm-4">
                 <div class="form-group">
                   <label>Cantidad:</label>
                   <input type="number" id="manual_product_qty" class="form-control" value="1" min="1" step="1">
+                </div>
+              </div>
+              <div class="col-sm-4">
+                <div class="form-group">
+                  <label>Stock inicial:</label>
+                  <div class="input-group">
+                    <input type="number" id="manual_product_stock" class="form-control" value="100" min="0" step="1">
+                    <span class="input-group-addon"><i class="fa fa-cubes"></i></span>
+                  </div>
                 </div>
               </div>
             </div>

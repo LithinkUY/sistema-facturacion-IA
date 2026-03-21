@@ -1393,6 +1393,7 @@ $(document).ready(function() {
         $('#manual_product_price').val('');
         $('#manual_product_qty').val(1);
         $('#manual_product_discount').val(0);
+        $('#manual_product_stock').val(100);
         $('#manual_product_modal').modal('show');
         setTimeout(function(){ $('#manual_product_name').focus(); }, 400);
     });
@@ -1402,6 +1403,7 @@ $(document).ready(function() {
         var price = parseFloat($('#manual_product_price').val());
         var qty = parseFloat($('#manual_product_qty').val()) || 1;
         var discount = parseFloat($('#manual_product_discount').val()) || 0;
+        var stock_quantity = parseInt($('#manual_product_stock').val()) || 0;
         var location_id = $('input#location_id').val();
 
         if (!name) {
@@ -1425,6 +1427,7 @@ $(document).ready(function() {
             data: {
                 name: name,
                 selling_price: price,
+                stock_quantity: stock_quantity,
                 location_id: location_id,
                 _token: $('meta[name="csrf-token"]').attr('content')
             },
@@ -1458,7 +1461,7 @@ $(document).ready(function() {
     });
 
     // Permitir Enter en el campo nombre del modal manual
-    $('#manual_product_modal').on('keypress', '#manual_product_name, #manual_product_price, #manual_product_qty, #manual_product_discount', function(e) {
+    $('#manual_product_modal').on('keypress', '#manual_product_name, #manual_product_price, #manual_product_qty, #manual_product_discount, #manual_product_stock', function(e) {
         if (e.which === 13) {
             $('#save_manual_product').trigger('click');
         }

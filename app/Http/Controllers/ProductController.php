@@ -1698,6 +1698,8 @@ class ProductController extends Controller
             }
 
             $selling_price = $request->input('selling_price');
+            $stock_quantity = $request->input('stock_quantity', 0);
+            $enable_stock = ($stock_quantity > 0) ? 1 : 0;
 
             $product_details = [
                 'name' => $request->input('name'),
@@ -1707,9 +1709,10 @@ class ProductController extends Controller
                 'created_by' => $request->session()->get('user.id'),
                 'sku' => ' ', // will be auto-generated
                 'barcode_type' => 'C128',
-                'enable_stock' => 0, // No stock management for manual products
+                'enable_stock' => $enable_stock,
                 'not_for_selling' => 0,
                 'tax_type' => 'exclusive',
+                'alert_quantity' => 0,
             ];
 
             $product = Product::create($product_details);
@@ -1747,8 +1750,41 @@ class ProductController extends Controller
                         'product_variation_id' => $variation->product_variation_id,
                         'variation_id' => $variation->id,
                         'location_id' => $location_id,
-                        'qty_available' => 0,
+                        'qty_available' => $stock_quantity,
                     ]);
+
+                    // If stock > 0, create opening stock transaction
+                    if ($stock_quantity > 0) {
+                        $user_id = $request->session()->get('user.id');
+                        $ref_count = $this->productUtil->setAndGetReferenceCount('opening_stock', $business_id);
+                        $ref = $this->productUtil->generateReferenceNumber('opening_stock', $ref_count, $business_id);
+
+                        $opening_stock_transaction = \App\Transaction::create([
+                            'type' => 'opening_stock',
+                            'status' => 'received',
+                            'business_id' => $business_id,
+                            'location_id' => $location_id,
+                            'transaction_date' => \Carbon\Carbon::now()->format('Y-m-d H:i:s'),
+                            'total_before_tax' => $selling_price * $stock_quantity,
+                            'final_total' => $selling_price * $stock_quantity,
+                            'ref_no' => $ref,
+                            'created_by' => $user_id,
+                        ]);
+
+                        \App\PurchaseLine::create([
+                            'transaction_id' => $opening_stock_transaction->id,
+                            'product_id' => $product->id,
+                            'variation_id' => $variation->id,
+                            'quantity' => $stock_quantity,
+                            'pp_without_discount' => $selling_price,
+                            'purchase_price' => $selling_price,
+                            'purchase_price_inc_tax' => $selling_price,
+                            'item_tax' => 0,
+                            'tax_id' => null,
+                            'exp_date' => null,
+                            'lot_number' => null,
+                        ]);
+                    }
                 }
             }
 
