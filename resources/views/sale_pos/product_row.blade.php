@@ -84,6 +84,9 @@
 		@php
 			$product_name = e($product->product_name) . '<br/>' . $product->sub_sku;
 			if(!empty($product->brand)){ $product_name .= ' ' . $product->brand; }
+			if(!empty($product->product_currency_code) && $product->product_currency_code != session('currency.code', 'UYU')){
+				$product_name .= ' <span class="badge" style="background-color:#28a745;color:#fff;font-size:10px;">' . $product->product_currency_code . '</span>';
+			}
 		@endphp
 		{!! $product_name !!}
 		<input type="hidden" class="enable_sr_no" value="{{$product->enable_sr_no}}">
@@ -96,6 +99,7 @@
 		<input type="hidden" value="{{$product->variation_id}}" name="products[{{$row_count}}][variation_id]" class="row_variation_id">
 		<input type="hidden" value="{{$product->enable_stock}}" name="products[{{$row_count}}][enable_stock]">
 		<input type="hidden" name="products[{{$row_count}}][product_unit_id]" value="{{$product->unit_id}}">
+		<input type="hidden" class="product_currency_code" value="{{$product->product_currency_code ?? ''}}">
 		<input type="hidden" class="base_unit_multiplier" name="products[{{$row_count}}][base_unit_multiplier]" value="{{$multiplier}}">
 		<input type="hidden" class="hidden_base_unit_sell_price" value="{{$product->default_sell_price / $multiplier}}">
 
@@ -201,6 +205,9 @@
 		@php
 			$product_name = e($product->product_name) . '<br/>' . $product->sub_sku ;
 			if(!empty($product->brand)){ $product_name .= ' ' . $product->brand ;}
+			if(!empty($product->product_currency_code) && $product->product_currency_code != session('currency.code', 'UYU')){
+				$product_name .= ' <span class="badge" style="background-color:#28a745;color:#fff;font-size:10px;">' . $product->product_currency_code . '</span>';
+			}
 		@endphp
 
 		@if( ($edit_price || $edit_discount) && empty($is_direct_sell) )

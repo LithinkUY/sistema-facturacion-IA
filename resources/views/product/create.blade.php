@@ -339,6 +339,13 @@
             </div>
         </div>
 
+        <div class="col-sm-4">
+            <div class="form-group">
+                {!! Form::label('currency_id', 'Moneda del producto:') !!}
+                {!! Form::select('currency_id', $currencies ?? [], !empty($duplicate_product->currency_id) ? $duplicate_product->currency_id : null, ['placeholder' => 'Moneda del negocio (por defecto)', 'class' => 'form-control select2']); !!}
+            </div>
+        </div>
+
         <div class="clearfix"></div>
 
         <div class="col-sm-4">

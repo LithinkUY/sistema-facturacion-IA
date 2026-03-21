@@ -239,6 +239,12 @@ Route::middleware(['setData', 'auth', 'SetSessionData', 'language', 'timezone', 
     Route::get('/sells/pos/get-recent-transactions', [SellPosController::class, 'getRecentTransactions']);
     Route::get('/sells/pos/get-product-suggestion', [SellPosController::class, 'getProductSuggestion']);
     Route::get('/sells/pos/get-featured-products/{location_id}', [SellPosController::class, 'getFeaturedProducts']);
+
+    // Exchange Rate / Cotización routes
+    Route::get('/exchange-rate/get', [\App\Http\Controllers\ExchangeRateController::class, 'getRate']);
+    Route::post('/exchange-rate/refresh', [\App\Http\Controllers\ExchangeRateController::class, 'refreshRate']);
+    Route::post('/exchange-rate/set-manual', [\App\Http\Controllers\ExchangeRateController::class, 'setManualRate']);
+
     Route::get('/reset-mapping', [SellController::class, 'resetMapping']);
     // pos display screen route
     Route::get('/customer-display', [SellPosController::class, 'posDisplay'])->name('pos_display');

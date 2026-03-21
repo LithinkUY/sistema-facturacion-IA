@@ -471,6 +471,7 @@ class ProductUtil extends Util
                     $join->on('p.brand_id', '=', 'brands.id')
                         ->whereNull('brands.deleted_at');
                 })
+                ->leftjoin('currencies as cur', 'p.currency_id', '=', 'cur.id')
                 ->where('p.business_id', $business_id)
                 ->where('variations.id', $variation_id);
 
@@ -539,6 +540,9 @@ class ProductUtil extends Util
             'units.allow_decimal as unit_allow_decimal',
             'u.short_name as second_unit',
             'brands.name as brand',
+            'p.currency_id',
+            'cur.code as product_currency_code',
+            'cur.symbol as product_currency_symbol',
             DB::raw('(SELECT purchase_price_inc_tax FROM purchase_lines WHERE 
                         variation_id=variations.id ORDER BY id DESC LIMIT 1) as last_purchased_price')
         )
