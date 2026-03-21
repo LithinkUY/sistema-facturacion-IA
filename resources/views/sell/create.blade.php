@@ -1128,12 +1128,18 @@
 						if (data.success) {
 							$('#manual_product_modal').modal('hide');
 							toastr.success(data.msg);
+							// Agregar disable_qty_alert temporalmente para que no bloquee por stock=0
+							// (el stock fue creado recién, puede tomar un momento en reflejarse)
+							if ($('#disable_qty_alert').length === 0) {
+								$('body').append('<input type="hidden" id="disable_qty_alert" value="1">');
+							}
 							// Trigger the same event as quickProductAdded to add the row
 							$(document).trigger({
 								type: 'quickProductAdded',
 								product: data.product,
 								variation: data.variation
 							});
+							setTimeout(function() { $('#disable_qty_alert').remove(); }, 500);
 						} else {
 							toastr.error(data.msg);
 						}
