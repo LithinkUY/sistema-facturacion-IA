@@ -85,7 +85,8 @@
 			$product_name = e($product->product_name) . '<br/>' . $product->sub_sku;
 			if(!empty($product->brand)){ $product_name .= ' ' . $product->brand; }
 			if(!empty($product->product_currency_code) && $product->product_currency_code != session('currency.code', 'UYU')){
-				$product_name .= ' <span class="badge" style="background-color:#28a745;color:#fff;font-size:10px;">' . $product->product_currency_code . '</span>';
+				$currency_label = !empty($product->product_currency_symbol) ? $product->product_currency_symbol : $product->product_currency_code;
+				$product_name .= ' <span class="badge" style="background-color:#28a745;color:#fff;font-size:10px;">' . $currency_label . '</span>';
 			}
 		@endphp
 		{!! $product_name !!}
@@ -206,7 +207,8 @@
 			$product_name = e($product->product_name) . '<br/>' . $product->sub_sku ;
 			if(!empty($product->brand)){ $product_name .= ' ' . $product->brand ;}
 			if(!empty($product->product_currency_code) && $product->product_currency_code != session('currency.code', 'UYU')){
-				$product_name .= ' <span class="badge" style="background-color:#28a745;color:#fff;font-size:10px;">' . $product->product_currency_code . '</span>';
+				$currency_label = !empty($product->product_currency_symbol) ? $product->product_currency_symbol : $product->product_currency_code;
+				$product_name .= ' <span class="badge" style="background-color:#28a745;color:#fff;font-size:10px;">' . $currency_label . '</span>';
 			}
 		@endphp
 

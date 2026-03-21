@@ -155,7 +155,7 @@ function convertFromBusinessCurrency(amount, currencyCode) {
  */
 function getCurrencySymbol(currencyCode) {
     var symbols = {
-        'USD': 'US$',
+        'USD': 'U$S',
         'UYU': '$U',
         'EUR': '€',
         'BRL': 'R$',
