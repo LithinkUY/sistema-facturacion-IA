@@ -128,6 +128,7 @@
         @endif
 
         @include('layouts.partials.javascripts')
+        <script src="{{ asset('js/exchange_rate.js?v=' . $asset_v) }}"></script>
         
         {{-- Module JS --}}
         @include('layouts.module-assets')

@@ -145,6 +145,47 @@
                     </svg>
                 </button>
 
+                {{-- Widget Cotización USD --}}
+                <div id="exchange_rate_widget" style="display:inline-block;position:relative;">
+                    <button type="button" id="btn_exchange_rate" title="Cotización USD"
+                        class="tw-hidden md:tw-inline-flex tw-items-center tw-justify-center tw-text-sm tw-font-medium tw-text-white tw-transition-all tw-duration-200 tw-p-1.5 tw-rounded-lg tw-ring-1 tw-ring-white/10"
+                        style="background:linear-gradient(90deg,#22c55e,#16a34a);cursor:pointer;gap:4px;padding:4px 12px;"
+                        onclick="toggleExchangeRatePanel()">
+                        <i class="fas fa-dollar-sign"></i>
+                        <span id="exchange_rate_display" style="font-weight:bold;">--</span>
+                        <i class="fas fa-sync-alt" style="font-size:10px;margin-left:2px;display:none;" id="exchange_rate_loading"></i>
+                    </button>
+                    <div id="exchange_rate_panel" style="display:none;position:absolute;top:40px;right:0;background:#fff;border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,0.15);padding:16px;z-index:9999;width:288px;border:1px solid #e5e7eb;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                            <h6 style="font-weight:bold;color:#374151;font-size:14px;margin:0;"><i class="fas fa-exchange-alt"></i> Cotización USD/UYU</h6>
+                            <button type="button" onclick="toggleExchangeRatePanel()" style="color:#9ca3af;border:none;background:transparent;cursor:pointer;font-size:14px;">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
+                            <div>
+                                <label style="font-size:11px;color:#6b7280;display:block;margin-bottom:4px;">Compra</label>
+                                <input type="number" id="exchange_buy_rate" class="form-control input-sm" style="text-align:center;font-weight:bold;" step="0.01" min="0" placeholder="0.00">
+                            </div>
+                            <div>
+                                <label style="font-size:11px;color:#6b7280;display:block;margin-bottom:4px;">Venta</label>
+                                <input type="number" id="exchange_sell_rate" class="form-control input-sm" style="text-align:center;font-weight:bold;" step="0.01" min="0" placeholder="0.00">
+                            </div>
+                        </div>
+                        <div style="font-size:11px;color:#9ca3af;margin-bottom:8px;" id="exchange_rate_info">
+                            <i class="fas fa-info-circle"></i> <span id="exchange_rate_source">Cargando...</span>
+                        </div>
+                        <div style="display:flex;gap:8px;">
+                            <button type="button" style="flex:1;background:#3b82f6;color:#fff;border:none;border-radius:4px;padding:6px;font-size:12px;font-weight:bold;cursor:pointer;" onclick="saveManualExchangeRate()">
+                                <i class="fas fa-save"></i> Guardar
+                            </button>
+                            <button type="button" style="flex:1;background:#f3f4f6;color:#4b5563;border:1px solid #d1d5db;border-radius:4px;padding:6px;font-size:12px;font-weight:bold;cursor:pointer;" onclick="refreshExchangeRate()">
+                                <i class="fas fa-sync-alt"></i> Actualizar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
                 @if (in_array('pos_sale', $enabled_modules))
                     @can('sell.create')
                         <a href="{{ action([\App\Http\Controllers\SellPosController::class, 'create']) }}"
