@@ -169,40 +169,41 @@
             </button>
 
             {{-- Widget Cotización USD --}}
-            <div class="tw-relative tw-inline-block" id="exchange_rate_widget">
+            <div class="tw-relative" id="exchange_rate_widget" style="display:inline-block;position:relative;">
                 <button type="button" id="btn_exchange_rate" title="Cotización USD"
-                    class="tw-shadow-[rgba(17,_17,_26,_0.1)_0px_0px_16px] tw-bg-gradient-to-r tw-from-green-500 tw-to-green-600 hover:tw-from-green-600 hover:tw-to-green-700 tw-cursor-pointer tw-border-0 tw-flex tw-items-center tw-justify-center tw-gap-1 tw-rounded-md tw-w-auto tw-h-8 tw-px-3 tw-text-white tw-font-bold tw-text-xs pull-right"
+                    class="pull-right"
+                    style="background: linear-gradient(90deg, #22c55e, #16a34a); color:#fff; border:none; border-radius:6px; padding:4px 12px; font-weight:bold; font-size:12px; cursor:pointer; height:32px; display:flex; align-items:center; gap:4px; box-shadow: 0 0 16px rgba(17,17,26,0.1);"
                     onclick="toggleExchangeRatePanel()">
                     <i class="fas fa-dollar-sign"></i>
-                    <span id="exchange_rate_display" class="tw-hidden md:tw-inline">--</span>
-                    <i class="fas fa-sync-alt tw-text-[10px] tw-ml-1 tw-hidden" id="exchange_rate_loading"></i>
+                    <span id="exchange_rate_display">--</span>
+                    <i class="fas fa-sync-alt" style="font-size:10px;margin-left:4px;display:none;" id="exchange_rate_loading"></i>
                 </button>
                 {{-- Panel desplegable para editar cotización --}}
-                <div id="exchange_rate_panel" class="tw-absolute tw-top-10 tw-right-0 tw-bg-white tw-rounded-lg tw-shadow-xl tw-p-4 tw-z-50 tw-w-72 tw-hidden tw-border tw-border-gray-200">
-                    <div class="tw-flex tw-justify-between tw-items-center tw-mb-3">
-                        <h6 class="tw-font-bold tw-text-gray-700 tw-text-sm tw-m-0"><i class="fas fa-exchange-alt"></i> Cotización USD/UYU</h6>
-                        <button type="button" onclick="toggleExchangeRatePanel()" class="tw-text-gray-400 hover:tw-text-gray-600 tw-border-0 tw-bg-transparent tw-cursor-pointer">
+                <div id="exchange_rate_panel" style="display:none;position:absolute;top:40px;right:0;background:#fff;border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,0.15);padding:16px;z-index:9999;width:288px;border:1px solid #e5e7eb;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                        <h6 style="font-weight:bold;color:#374151;font-size:14px;margin:0;"><i class="fas fa-exchange-alt"></i> Cotización USD/UYU</h6>
+                        <button type="button" onclick="toggleExchangeRatePanel()" style="color:#9ca3af;border:none;background:transparent;cursor:pointer;font-size:14px;">
                             <i class="fas fa-times"></i>
                         </button>
                     </div>
-                    <div class="tw-grid tw-grid-cols-2 tw-gap-2 tw-mb-3">
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
                         <div>
-                            <label class="tw-text-xs tw-text-gray-500 tw-block tw-mb-1">Compra</label>
-                            <input type="number" id="exchange_buy_rate" class="form-control input-sm tw-text-center tw-font-bold" step="0.01" min="0" placeholder="0.00">
+                            <label style="font-size:11px;color:#6b7280;display:block;margin-bottom:4px;">Compra</label>
+                            <input type="number" id="exchange_buy_rate" class="form-control input-sm" style="text-align:center;font-weight:bold;" step="0.01" min="0" placeholder="0.00">
                         </div>
                         <div>
-                            <label class="tw-text-xs tw-text-gray-500 tw-block tw-mb-1">Venta</label>
-                            <input type="number" id="exchange_sell_rate" class="form-control input-sm tw-text-center tw-font-bold" step="0.01" min="0" placeholder="0.00">
+                            <label style="font-size:11px;color:#6b7280;display:block;margin-bottom:4px;">Venta</label>
+                            <input type="number" id="exchange_sell_rate" class="form-control input-sm" style="text-align:center;font-weight:bold;" step="0.01" min="0" placeholder="0.00">
                         </div>
                     </div>
-                    <div class="tw-text-xs tw-text-gray-400 tw-mb-2" id="exchange_rate_info">
+                    <div style="font-size:11px;color:#9ca3af;margin-bottom:8px;" id="exchange_rate_info">
                         <i class="fas fa-info-circle"></i> <span id="exchange_rate_source">Cargando...</span>
                     </div>
-                    <div class="tw-flex tw-gap-2">
-                        <button type="button" class="tw-flex-1 tw-bg-blue-500 hover:tw-bg-blue-600 tw-text-white tw-border-0 tw-rounded tw-py-1.5 tw-text-xs tw-font-bold tw-cursor-pointer" onclick="saveManualExchangeRate()">
+                    <div style="display:flex;gap:8px;">
+                        <button type="button" style="flex:1;background:#3b82f6;color:#fff;border:none;border-radius:4px;padding:6px;font-size:12px;font-weight:bold;cursor:pointer;" onclick="saveManualExchangeRate()">
                             <i class="fas fa-save"></i> Guardar
                         </button>
-                        <button type="button" class="tw-flex-1 tw-bg-gray-100 hover:tw-bg-gray-200 tw-text-gray-600 tw-border tw-border-gray-300 tw-rounded tw-py-1.5 tw-text-xs tw-font-bold tw-cursor-pointer" onclick="refreshExchangeRate()">
+                        <button type="button" style="flex:1;background:#f3f4f6;color:#4b5563;border:1px solid #d1d5db;border-radius:4px;padding:6px;font-size:12px;font-weight:bold;cursor:pointer;" onclick="refreshExchangeRate()">
                             <i class="fas fa-sync-alt"></i> Actualizar
                         </button>
                     </div>

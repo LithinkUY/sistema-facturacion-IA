@@ -12,20 +12,20 @@ $(document).ready(function() {
     // Close panel when clicking outside
     $(document).on('click', function(e) {
         if (!$(e.target).closest('#exchange_rate_widget').length) {
-            $('#exchange_rate_panel').addClass('tw-hidden');
+            $('#exchange_rate_panel').hide();
         }
     });
 });
 
 function loadExchangeRate() {
-    $('#exchange_rate_loading').removeClass('tw-hidden');
+    $('#exchange_rate_loading').show();
     
     $.ajax({
         url: '/exchange-rate/get',
         type: 'GET',
         dataType: 'json',
         success: function(response) {
-            $('#exchange_rate_loading').addClass('tw-hidden');
+            $('#exchange_rate_loading').hide();
             if (response.success && response.data) {
                 currentExchangeRate = response.data;
                 updateExchangeRateDisplay(response.data);
@@ -34,7 +34,7 @@ function loadExchangeRate() {
             }
         },
         error: function() {
-            $('#exchange_rate_loading').addClass('tw-hidden');
+            $('#exchange_rate_loading').hide();
             $('#exchange_rate_display').text('N/D');
         }
     });
@@ -55,7 +55,7 @@ function updateExchangeRateDisplay(data) {
 }
 
 function toggleExchangeRatePanel() {
-    $('#exchange_rate_panel').toggleClass('tw-hidden');
+    $('#exchange_rate_panel').toggle();
 }
 
 function saveManualExchangeRate() {
@@ -81,7 +81,7 @@ function saveManualExchangeRate() {
                 currentExchangeRate = response.data;
                 updateExchangeRateDisplay(response.data);
                 toastr.success('Cotización guardada: Compra $' + buyRate.toFixed(2) + ' / Venta $' + sellRate.toFixed(2));
-                $('#exchange_rate_panel').addClass('tw-hidden');
+                $('#exchange_rate_panel').hide();
             } else {
                 toastr.error('Error al guardar la cotización');
             }
@@ -93,7 +93,7 @@ function saveManualExchangeRate() {
 }
 
 function refreshExchangeRate() {
-    $('#exchange_rate_loading').removeClass('tw-hidden');
+    $('#exchange_rate_loading').show();
     
     $.ajax({
         url: '/exchange-rate/refresh',
@@ -103,7 +103,7 @@ function refreshExchangeRate() {
         },
         dataType: 'json',
         success: function(response) {
-            $('#exchange_rate_loading').addClass('tw-hidden');
+            $('#exchange_rate_loading').hide();
             if (response.success) {
                 currentExchangeRate = response.data;
                 updateExchangeRateDisplay(response.data);
@@ -113,7 +113,7 @@ function refreshExchangeRate() {
             }
         },
         error: function() {
-            $('#exchange_rate_loading').addClass('tw-hidden');
+            $('#exchange_rate_loading').hide();
             toastr.error('Error de conexión al actualizar cotización');
         }
     });
