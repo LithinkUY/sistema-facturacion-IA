@@ -484,6 +484,8 @@ class ProductController extends Controller
 
             if (! empty($product_details['alert_quantity'])) {
                 $product_details['alert_quantity'] = $this->productUtil->num_uf($product_details['alert_quantity']);
+            } else {
+                $product_details['alert_quantity'] = 0;
             }
 
             $expiry_enabled = $request->session()->get('business.enable_product_expiry');
@@ -1063,6 +1065,16 @@ class ProductController extends Controller
                 if ($can_be_deleted) {
                     if (! empty($product)) {
                         DB::beginTransaction();
+
+                        //Delete opening stock transactions and their purchase lines
+                        $opening_stock_ids = Transaction::where('opening_stock_product_id', $id)
+                            ->where('business_id', $business_id)
+                            ->pluck('id');
+                        if ($opening_stock_ids->isNotEmpty()) {
+                            PurchaseLine::whereIn('transaction_id', $opening_stock_ids)->delete();
+                            Transaction::whereIn('id', $opening_stock_ids)->delete();
+                        }
+
                         //Delete variation location details
                         VariationLocationDetails::where('product_id', $id)
                                                 ->delete();
@@ -1587,6 +1599,8 @@ class ProductController extends Controller
 
             if (! empty($product_details['alert_quantity'])) {
                 $product_details['alert_quantity'] = $this->productUtil->num_uf($product_details['alert_quantity']);
+            } else {
+                $product_details['alert_quantity'] = 0;
             }
 
             $expiry_enabled = $request->session()->get('business.enable_product_expiry');
@@ -1835,7 +1849,7 @@ class ProductController extends Controller
 
                 $products = Product::where('business_id', $business_id)
                                     ->whereIn('id', $selected_rows)
-                                    ->with(['purchase_lines', 'variations'])
+                                    ->with(['purchase_lines.transaction', 'variations'])
                                     ->get();
                 $deletable_products = [];
 
@@ -1854,14 +1868,33 @@ class ProductController extends Controller
                         $can_be_deleted = ! $exists_as_ingredient;
                     }
 
-                    //Delete if no purchase found
-                    if (empty($product->purchase_lines->toArray()) && $can_be_deleted) {
+                    //Delete if no purchase found (opening_stock with quantity_sold=0 is OK to delete)
+                    $non_opening_stock_lines = $product->purchase_lines->filter(function($line) {
+                        return $line->transaction && $line->transaction->type !== 'opening_stock';
+                    });
+                    $has_sold_opening_stock = $product->purchase_lines->filter(function($line) {
+                        return $line->transaction && $line->transaction->type === 'opening_stock' && $line->quantity_sold > 0;
+                    });
+
+                    if ($non_opening_stock_lines->isEmpty() && $has_sold_opening_stock->isEmpty() && $can_be_deleted) {
+                        //Delete opening stock transactions first
+                        $opening_stock_transaction_ids = $product->purchase_lines->filter(function($line) {
+                            return $line->transaction && $line->transaction->type === 'opening_stock';
+                        })->pluck('transaction_id')->unique();
+
+                        if ($opening_stock_transaction_ids->isNotEmpty()) {
+                            PurchaseLine::where('product_id', $product->id)
+                                ->whereIn('transaction_id', $opening_stock_transaction_ids)
+                                ->delete();
+                            Transaction::whereIn('id', $opening_stock_transaction_ids)->delete();
+                        }
+
                         //Delete variation location details
                         VariationLocationDetails::where('product_id', $product->id)
                                                     ->delete();
                         $product->delete();
                         event(new ProductsCreatedOrModified($product, 'Deleted'));
-                    } else {
+                    } else if (!$non_opening_stock_lines->isEmpty() || !$has_sold_opening_stock->isEmpty()) {
                         $purchase_exist = true;
                     }
                 }
