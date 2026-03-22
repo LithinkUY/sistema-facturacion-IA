@@ -1716,6 +1716,7 @@ class SellPosController extends Controller
 
         if (request()->input('disable_qty_alert') === 'true') {
             $pos_settings['allow_overselling'] = true;
+            $check_qty = false;
         }
 
         $product = $this->productUtil->getDetailsFromVariation($variation_id, $business_id, $location_id, $check_qty);
