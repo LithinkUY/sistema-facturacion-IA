@@ -978,79 +978,19 @@ class ProductController extends Controller
                 $can_be_deleted = true;
                 $error_msg = '';
 
-                //Check if any purchase or transfer exists
-                $count = PurchaseLine::join(
-                    'transactions as T',
-                    'purchase_lines.transaction_id',
-                    '=',
-                    'T.id'
-                )
-                                    ->whereIn('T.type', ['purchase'])
-                                    ->where('T.business_id', $business_id)
-                                    ->where('purchase_lines.product_id', $id)
-                                    ->count();
-                if ($count > 0) {
-                    $can_be_deleted = false;
-                    $error_msg = __('lang_v1.purchase_already_exist');
-                } else {
-                    //Check if any opening stock sold
-                    $count = PurchaseLine::join(
-                        'transactions as T',
-                        'purchase_lines.transaction_id',
-                        '=',
-                        'T.id'
-                     )
-                                    ->where('T.type', 'opening_stock')
-                                    ->where('T.business_id', $business_id)
-                                    ->where('purchase_lines.product_id', $id)
-                                    ->where('purchase_lines.quantity_sold', '>', 0)
-                                    ->count();
-                    if ($count > 0) {
-                        $can_be_deleted = false;
-                        $error_msg = __('lang_v1.opening_stock_sold');
-                    } else {
-                        //Check if any stock is adjusted
-                        $count = PurchaseLine::join(
-                            'transactions as T',
-                            'purchase_lines.transaction_id',
-                            '=',
-                            'T.id'
-                        )
-                                    ->where('T.business_id', $business_id)
-                                    ->where('purchase_lines.product_id', $id)
-                                    ->where('purchase_lines.quantity_adjusted', '>', 0)
-                                    ->count();
-                        if ($count > 0) {
-                            $can_be_deleted = false;
-                            $error_msg = __('lang_v1.stock_adjusted');
-                        }
-                    }
-                }
-
                 $product = Product::where('id', $id)
                                 ->where('business_id', $business_id)
                                 ->with('variations')
                                 ->first();
 
-                // check for enable stock = 0 product
-                if($product->enable_stock == 0){
-                    $t_count = TransactionSellLine::join(
-                        'transactions as T',
-                        'transaction_sell_lines.transaction_id',
-                        '=',
-                        'T.id'
-                    )
-                        ->where('T.business_id', $business_id)
-                        ->where('transaction_sell_lines.product_id', $id)
-                        ->count();
-
-                    if ($t_count > 0) {
-                        $can_be_deleted = false;
-                        $error_msg = "can't delete product exit in sell";
-                    }
+                if (empty($product)) {
+                    $output = ['success' => false,
+                        'msg' => __('messages.something_went_wrong'),
+                    ];
+                    return $output;
                 }
 
-                //Check if product is added as an ingredient of any recipe
+                //Check if product is added as an ingredient of any recipe (única restricción que se mantiene)
                 if ($this->moduleUtil->isModuleInstalled('Manufacturing')) {
                     $variation_ids = $product->variations->pluck('id');
 
@@ -1061,27 +1001,37 @@ class ProductController extends Controller
                         $error_msg = __('manufacturing::lang.added_as_ingredient');
                     }
                 }
-            
+
                 if ($can_be_deleted) {
-                    if (! empty($product)) {
-                        DB::beginTransaction();
+                    DB::beginTransaction();
 
-                        //Delete opening stock transactions and their purchase lines
-                        $opening_stock_ids = Transaction::where('opening_stock_product_id', $id)
-                            ->where('business_id', $business_id)
-                            ->pluck('id');
-                        if ($opening_stock_ids->isNotEmpty()) {
-                            PurchaseLine::whereIn('transaction_id', $opening_stock_ids)->delete();
-                            Transaction::whereIn('id', $opening_stock_ids)->delete();
-                        }
-
-                        //Delete variation location details
-                        VariationLocationDetails::where('product_id', $id)
-                                                ->delete();
-                        $product->delete();
-                        event(new ProductsCreatedOrModified($product, 'deleted'));
-                        DB::commit();
+                    // Eliminar líneas de venta relacionadas
+                    $variation_ids = $product->variations->pluck('id');
+                    TransactionSellLine::where('product_id', $id)->delete();
+                    if ($variation_ids->isNotEmpty()) {
+                        TransactionSellLine::whereIn('variation_id', $variation_ids)->delete();
                     }
+
+                    // Eliminar líneas de compra relacionadas
+                    PurchaseLine::where('product_id', $id)->delete();
+                    if ($variation_ids->isNotEmpty()) {
+                        PurchaseLine::whereIn('variation_id', $variation_ids)->delete();
+                    }
+
+                    // Eliminar transacciones de stock inicial vinculadas al producto
+                    $opening_stock_ids = Transaction::where('opening_stock_product_id', $id)
+                        ->where('business_id', $business_id)
+                        ->pluck('id');
+                    if ($opening_stock_ids->isNotEmpty()) {
+                        Transaction::whereIn('id', $opening_stock_ids)->delete();
+                    }
+
+                    // Eliminar detalles de ubicación de variaciones
+                    VariationLocationDetails::where('product_id', $id)->delete();
+
+                    $product->delete();
+                    event(new ProductsCreatedOrModified($product, 'deleted'));
+                    DB::commit();
 
                     $output = ['success' => true,
                         'msg' => __('lang_v1.product_delete_success'),
@@ -1745,12 +1695,13 @@ class ProductController extends Controller
 
                 // Also create variation_location_details so the product appears in search
                 if ($variation) {
+                    // Create VLD with qty=0, updateProductQuantity sumará la cantidad correctamente
                     \App\VariationLocationDetails::create([
                         'product_id' => $product->id,
                         'product_variation_id' => $variation->product_variation_id,
                         'variation_id' => $variation->id,
                         'location_id' => $location_id,
-                        'qty_available' => $stock_quantity,
+                        'qty_available' => 0,
                     ]);
 
                     // If stock > 0, create opening stock transaction
@@ -1759,8 +1710,17 @@ class ProductController extends Controller
                         $ref_count = $this->productUtil->setAndGetReferenceCount('opening_stock', $business_id);
                         $ref = $this->productUtil->generateReferenceNumber('opening_stock', $ref_count, $business_id);
 
+                        // Get a valid contact_id (required by FK constraint)
+                        $contact_id = \App\Contact::where('business_id', $business_id)
+                            ->where('type', 'supplier')
+                            ->first()->id ?? null;
+                        if (empty($contact_id)) {
+                            $contact_id = \App\Contact::where('business_id', $business_id)->first()->id ?? null;
+                        }
+
                         $opening_stock_transaction = \App\Transaction::create([
                             'type' => 'opening_stock',
+                            'opening_stock_product_id' => $product->id,
                             'status' => 'received',
                             'business_id' => $business_id,
                             'location_id' => $location_id,
@@ -1768,6 +1728,8 @@ class ProductController extends Controller
                             'total_before_tax' => $selling_price * $stock_quantity,
                             'final_total' => $selling_price * $stock_quantity,
                             'ref_no' => $ref,
+                            'payment_status' => 'paid',
+                            'contact_id' => $contact_id,
                             'created_by' => $user_id,
                         ]);
 
@@ -1784,6 +1746,9 @@ class ProductController extends Controller
                             'exp_date' => null,
                             'lot_number' => null,
                         ]);
+
+                        // Actualizar qty_available en variation_location_details
+                        $this->productUtil->updateProductQuantity($location_id, $product->id, $variation->id, $stock_quantity);
                     }
                 }
             }
@@ -1876,8 +1841,6 @@ class ProductController extends Controller
             abort(403, 'Unauthorized action.');
         }
         try {
-            $purchase_exist = false;
-
             if (! empty($request->input('selected_rows'))) {
                 $business_id = $request->session()->get('user.business_id');
 
@@ -1885,9 +1848,8 @@ class ProductController extends Controller
 
                 $products = Product::where('business_id', $business_id)
                                     ->whereIn('id', $selected_rows)
-                                    ->with(['purchase_lines.transaction', 'variations'])
+                                    ->with(['variations'])
                                     ->get();
-                $deletable_products = [];
 
                 $is_mfg_installed = $this->moduleUtil->isModuleInstalled('Manufacturing');
 
@@ -1895,58 +1857,52 @@ class ProductController extends Controller
 
                 foreach ($products as $product) {
                     $can_be_deleted = true;
-                    //Check if product is added as an ingredient of any recipe
+
+                    // Única restricción: ingrediente de receta de fabricación
                     if ($is_mfg_installed) {
                         $variation_ids = $product->variations->pluck('id');
-
                         $exists_as_ingredient = \Modules\Manufacturing\Entities\MfgRecipeIngredient::whereIn('variation_id', $variation_ids)
                             ->exists();
                         $can_be_deleted = ! $exists_as_ingredient;
                     }
 
-                    //Delete if no purchase found (opening_stock with quantity_sold=0 is OK to delete)
-                    $non_opening_stock_lines = $product->purchase_lines->filter(function($line) {
-                        return $line->transaction && $line->transaction->type !== 'opening_stock';
-                    });
-                    $has_sold_opening_stock = $product->purchase_lines->filter(function($line) {
-                        return $line->transaction && $line->transaction->type === 'opening_stock' && $line->quantity_sold > 0;
-                    });
+                    if ($can_be_deleted) {
+                        $variation_ids = $product->variations->pluck('id');
 
-                    if ($non_opening_stock_lines->isEmpty() && $has_sold_opening_stock->isEmpty() && $can_be_deleted) {
-                        //Delete opening stock transactions first
-                        $opening_stock_transaction_ids = $product->purchase_lines->filter(function($line) {
-                            return $line->transaction && $line->transaction->type === 'opening_stock';
-                        })->pluck('transaction_id')->unique();
-
-                        if ($opening_stock_transaction_ids->isNotEmpty()) {
-                            PurchaseLine::where('product_id', $product->id)
-                                ->whereIn('transaction_id', $opening_stock_transaction_ids)
-                                ->delete();
-                            Transaction::whereIn('id', $opening_stock_transaction_ids)->delete();
+                        // Eliminar líneas de venta
+                        TransactionSellLine::where('product_id', $product->id)->delete();
+                        if ($variation_ids->isNotEmpty()) {
+                            TransactionSellLine::whereIn('variation_id', $variation_ids)->delete();
                         }
 
-                        //Delete variation location details
-                        VariationLocationDetails::where('product_id', $product->id)
-                                                    ->delete();
+                        // Eliminar líneas de compra
+                        PurchaseLine::where('product_id', $product->id)->delete();
+                        if ($variation_ids->isNotEmpty()) {
+                            PurchaseLine::whereIn('variation_id', $variation_ids)->delete();
+                        }
+
+                        // Eliminar transacciones de stock inicial
+                        $opening_stock_ids = Transaction::where('opening_stock_product_id', $product->id)
+                            ->where('business_id', $business_id)
+                            ->pluck('id');
+                        if ($opening_stock_ids->isNotEmpty()) {
+                            Transaction::whereIn('id', $opening_stock_ids)->delete();
+                        }
+
+                        // Eliminar detalles de ubicación
+                        VariationLocationDetails::where('product_id', $product->id)->delete();
+
                         $product->delete();
                         event(new ProductsCreatedOrModified($product, 'Deleted'));
-                    } else if (!$non_opening_stock_lines->isEmpty() || !$has_sold_opening_stock->isEmpty()) {
-                        $purchase_exist = true;
                     }
                 }
 
                 DB::commit();
             }
 
-            if (! $purchase_exist) {
-                $output = ['success' => 1,
-                    'msg' => __('lang_v1.deleted_success'),
-                ];
-            } else {
-                $output = ['success' => 0,
-                    'msg' => __('lang_v1.products_could_not_be_deleted'),
-                ];
-            }
+            $output = ['success' => 1,
+                'msg' => __('lang_v1.deleted_success'),
+            ];
         } catch (\Exception $e) {
             DB::rollBack();
             \Log::emergency('File:'.$e->getFile().'Line:'.$e->getLine().'Message:'.$e->getMessage());
