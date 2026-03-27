@@ -158,9 +158,12 @@
 		<small>{{$product->unit}}</small>
 	</td>
 
-	{{-- PRECIO REGULAR (read only display) --}}
+	{{-- PRECIO REGULAR (editable) --}}
 	<td class="text-right">
-		<span class="unified_precio_regular_display" style="font-size: 13px;">{{ @num_format($precio_regular) }}</span>
+		<input type="text" class="form-control input_number unified_precio_regular_input"
+			value="{{@num_format($precio_regular)}}"
+			style="width: 100px; text-align: right;"
+			placeholder="0">
 	</td>
 
 	{{-- PRECIO OFERTA (editable) --}}

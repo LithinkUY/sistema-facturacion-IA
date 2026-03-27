@@ -982,6 +982,21 @@
 				row.find('span.pos_line_total_text').text(__currency_trans_from_en(total, true));
 			}
 
+			$(document).on('change keyup', '.unified_precio_regular_input', function() {
+				var row = $(this).closest('tr.unified_row');
+				var newRegular = __read_number($(this));
+				if (!newRegular || newRegular < 0) newRegular = 0;
+				row.find('.unified_precio_regular_val').val(newRegular);
+				var ofertaInput = row.find('.unified_precio_oferta_input');
+				var oferta = __read_number(ofertaInput);
+				if (!oferta || oferta <= 0 || oferta > newRegular) {
+					__write_number(ofertaInput, newRegular);
+				}
+				__write_number(row.find('.pos_unit_price'), newRegular);
+				recalcUnifiedRow(row);
+				pos_total_row();
+			});
+
 			$(document).on('change keyup', '.unified_precio_oferta_input', function() {
 				var row = $(this).closest('tr.unified_row');
 				recalcUnifiedRow(row);
