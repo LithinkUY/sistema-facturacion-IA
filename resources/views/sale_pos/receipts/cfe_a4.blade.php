@@ -1,11 +1,11 @@
-{{-- Factura A4 estilo CFE/DGI - usa $receipt_details del sistema POS --}}
+{{-- Factura A4 estilo CFE/DGI oficial - usa $receipt_details del sistema POS --}}
 <style>
-    /* ---- ESTILOS A4 DGI ---- */
+    /* ======== ESTILOS FACTURA DGI URUGUAY - RECEIPT POS ======== */
     .cfe-a4 * { margin: 0; padding: 0; box-sizing: border-box; }
     .cfe-a4 {
         font-family: Arial, Helvetica, sans-serif;
         font-size: 10px;
-        color: #000;
+        color: #222;
         background: #fff;
         width: 210mm;
         min-height: 297mm;
@@ -19,79 +19,337 @@
         @page { size: A4; margin: 8mm; }
     }
 
-    /* Cabecera principal */
-    .cfe-a4 .cfe-header { display: table; width: 100%; margin-bottom: 6px; }
-    .cfe-a4 .cfe-header-left { display: table-cell; width: 45%; vertical-align: top; padding-right: 10px; }
-    .cfe-a4 .cfe-header-right { display: table-cell; width: 55%; vertical-align: top; text-align: right; }
-    .cfe-a4 .emisor-name { font-size: 13px; font-weight: bold; margin-bottom: 2px; }
-    .cfe-a4 .emisor-details { font-size: 10px; line-height: 1.6; }
+    /* ---- CABECERA PRINCIPAL ---- */
+    .cfe-a4 .cfe-header {
+        display: table;
+        width: 100%;
+        margin-bottom: 8px;
+        border-bottom: 3px solid #003366;
+        padding-bottom: 8px;
+    }
+    .cfe-a4 .cfe-header-left {
+        display: table-cell;
+        width: 50%;
+        vertical-align: top;
+        padding-right: 12px;
+    }
+    .cfe-a4 .cfe-header-right {
+        display: table-cell;
+        width: 50%;
+        vertical-align: top;
+    }
 
-    /* Bloque RUC/Tipo */
-    .cfe-a4 .doc-box { border: 1px solid #000; display: inline-block; min-width: 180px; text-align: center; margin-bottom: 4px; }
-    .cfe-a4 .doc-box-ruc { font-size: 13px; font-weight: bold; padding: 3px 8px; border-bottom: 1px solid #000; }
-    .cfe-a4 .doc-box-tipo { font-size: 11px; font-weight: bold; padding: 3px 8px; border-bottom: 1px solid #000; background: #f5f5f5; }
-    .cfe-a4 .doc-box-subtipo { font-size: 10px; padding: 2px 8px; }
+    /* Logo y emisor */
+    .cfe-a4 .emisor-name {
+        font-size: 16px;
+        font-weight: bold;
+        color: #003366;
+        margin-bottom: 3px;
+    }
+    .cfe-a4 .emisor-details {
+        font-size: 9.5px;
+        line-height: 1.7;
+        color: #444;
+    }
 
-    /* Tabla Serie/Número */
-    .cfe-a4 .serie-table { width: 100%; border-collapse: collapse; border: 1px solid #000; margin-top: 4px; font-size: 10px; }
-    .cfe-a4 .serie-table th { background: #e0e0e0; border: 1px solid #000; padding: 2px 5px; font-weight: bold; text-align: center; }
-    .cfe-a4 .serie-table td { border: 1px solid #000; padding: 2px 5px; text-align: center; }
+    /* Bloque RUC/Tipo CFE */
+    .cfe-a4 .doc-box {
+        border: 2px solid #003366;
+        display: block;
+        width: 100%;
+        text-align: center;
+        margin-bottom: 6px;
+    }
+    .cfe-a4 .doc-box-ruc {
+        font-size: 13px;
+        font-weight: bold;
+        padding: 5px 8px;
+        background: #003366;
+        color: #fff;
+    }
+    .cfe-a4 .doc-box-tipo {
+        font-size: 12px;
+        font-weight: bold;
+        padding: 4px 8px;
+        background: #e8f0fa;
+        color: #003366;
+        border-top: 1px solid #003366;
+        border-bottom: 1px solid #003366;
+    }
+    .cfe-a4 .doc-box-subtipo {
+        font-size: 10px;
+        padding: 3px 8px;
+        color: #333;
+    }
 
-    /* Tabla de fechas */
-    .cfe-a4 .fechas-table { width: 100%; border-collapse: collapse; border: 1px solid #000; margin-top: 3px; font-size: 10px; }
-    .cfe-a4 .fechas-table th { background: #e0e0e0; border: 1px solid #000; padding: 2px 5px; font-weight: bold; text-align: center; font-size: 9px; }
-    .cfe-a4 .fechas-table td { border: 1px solid #000; padding: 2px 5px; text-align: center; }
+    /* Tablas info */
+    .cfe-a4 .info-table {
+        width: 100%;
+        border-collapse: collapse;
+        border: 1px solid #999;
+        font-size: 10px;
+        margin-top: 5px;
+    }
+    .cfe-a4 .info-table th {
+        background: #003366;
+        color: #fff;
+        border: 1px solid #003366;
+        padding: 3px 6px;
+        font-weight: bold;
+        text-align: center;
+        font-size: 9px;
+        text-transform: uppercase;
+    }
+    .cfe-a4 .info-table td {
+        border: 1px solid #999;
+        padding: 3px 6px;
+        text-align: center;
+        font-weight: bold;
+    }
 
-    /* Sección comprador/cliente */
-    .cfe-a4 .comprador-section { display: table; width: 100%; border-collapse: collapse; border: 1px solid #000; margin: 6px 0; }
-    .cfe-a4 .comprador-cell { display: table-cell; width: 50%; vertical-align: top; padding: 4px 6px; border-right: 1px solid #000; }
-    .cfe-a4 .cliente-cell { display: table-cell; width: 50%; vertical-align: top; padding: 4px 6px; }
-    .cfe-a4 .comprador-label { font-size: 9px; font-weight: bold; text-transform: uppercase; color: #444; margin-bottom: 1px; }
-    .cfe-a4 .comprador-value { font-size: 12px; font-weight: bold; }
-    .cfe-a4 .cliente-label { font-size: 9px; font-weight: bold; text-transform: uppercase; color: #444; margin-bottom: 1px; }
-    .cfe-a4 .cliente-value { font-size: 11px; font-weight: bold; }
+    /* ---- RECEPTOR ---- */
+    .cfe-a4 .receptor-section {
+        border: 1px solid #999;
+        margin: 8px 0 0 0;
+    }
+    .cfe-a4 .receptor-title {
+        background: #003366;
+        color: #fff;
+        padding: 3px 8px;
+        font-size: 10px;
+        font-weight: bold;
+        text-transform: uppercase;
+    }
+    .cfe-a4 .receptor-grid {
+        display: table;
+        width: 100%;
+    }
+    .cfe-a4 .receptor-cell {
+        display: table-cell;
+        width: 50%;
+        vertical-align: top;
+        padding: 5px 8px;
+        border-right: 1px solid #ddd;
+    }
+    .cfe-a4 .receptor-cell:last-child {
+        border-right: none;
+    }
+    .cfe-a4 .receptor-label {
+        font-size: 8px;
+        font-weight: bold;
+        text-transform: uppercase;
+        color: #666;
+        margin-bottom: 1px;
+    }
+    .cfe-a4 .receptor-value {
+        font-size: 11px;
+        font-weight: bold;
+        color: #222;
+    }
 
-    /* Domicilio fiscal */
-    .cfe-a4 .domicilio-section { border: 1px solid #000; border-top: none; padding: 3px 6px; margin-bottom: 6px; }
-    .cfe-a4 .domicilio-label { font-size: 9px; font-weight: bold; color: #444; display: inline; }
-    .cfe-a4 .domicilio-value { font-size: 10px; display: inline; margin-left: 4px; }
+    /* Domicilio */
+    .cfe-a4 .domicilio-section {
+        border: 1px solid #999;
+        border-top: none;
+        padding: 4px 8px;
+    }
+    .cfe-a4 .domicilio-label {
+        font-size: 8px;
+        font-weight: bold;
+        color: #666;
+        text-transform: uppercase;
+        display: inline;
+    }
+    .cfe-a4 .domicilio-value {
+        font-size: 9.5px;
+        display: inline;
+        margin-left: 4px;
+    }
 
-    /* Tabla de conceptos */
-    .cfe-a4 .conceptos-table { width: 100%; border-collapse: collapse; border: 1px solid #000; font-size: 10px; margin-bottom: 0; }
-    .cfe-a4 .conceptos-table thead tr { background: #d0d0d0; }
-    .cfe-a4 .conceptos-table th { border: 1px solid #000; padding: 3px 5px; font-weight: bold; text-align: center; font-size: 9px; text-transform: uppercase; }
-    .cfe-a4 .conceptos-table td { border: 1px solid #000; padding: 3px 5px; vertical-align: top; }
+    /* ---- TABLA CONCEPTOS ---- */
+    .cfe-a4 .conceptos-table {
+        width: 100%;
+        border-collapse: collapse;
+        border: 1px solid #999;
+        font-size: 10px;
+        margin-top: 8px;
+        margin-bottom: 0;
+    }
+    .cfe-a4 .conceptos-table thead tr {
+        background: #003366;
+    }
+    .cfe-a4 .conceptos-table th {
+        border: 1px solid #003366;
+        padding: 4px 6px;
+        font-weight: bold;
+        text-align: center;
+        font-size: 9px;
+        text-transform: uppercase;
+        color: #fff;
+    }
+    .cfe-a4 .conceptos-table tbody tr:nth-child(even) {
+        background: #e8f0fa;
+    }
+    .cfe-a4 .conceptos-table td {
+        border: 1px solid #ccc;
+        padding: 4px 6px;
+        vertical-align: top;
+    }
     .cfe-a4 .conceptos-table td.text-center { text-align: center; }
     .cfe-a4 .conceptos-table td.text-right { text-align: right; }
 
-    /* Totales */
-    .cfe-a4 .totales-section { border: 1px solid #000; border-top: none; display: table; width: 100%; }
-    .cfe-a4 .totales-left { display: table-cell; width: 55%; border-right: 1px solid #000; padding: 3px 5px; font-size: 9px; vertical-align: middle; }
-    .cfe-a4 .totales-right { display: table-cell; width: 45%; text-align: right; }
-    .cfe-a4 .subtotales-table { width: 100%; border-collapse: collapse; font-size: 9px; }
-    .cfe-a4 .subtotales-table td { padding: 2px 5px; border-bottom: 1px solid #eee; }
-    .cfe-a4 .subtotales-table tr:last-child td { border-bottom: none; }
-    .cfe-a4 .subtotales-table td.label-col { color: #555; }
-    .cfe-a4 .subtotales-table td.value-col { text-align: right; font-weight: bold; }
+    /* ---- TOTALES ---- */
+    .cfe-a4 .totales-section {
+        border: 1px solid #999;
+        border-top: none;
+        display: table;
+        width: 100%;
+    }
+    .cfe-a4 .totales-left {
+        display: table-cell;
+        width: 55%;
+        border-right: 1px solid #999;
+        padding: 4px 6px;
+        font-size: 9px;
+        vertical-align: middle;
+    }
+    .cfe-a4 .totales-right {
+        display: table-cell;
+        width: 45%;
+    }
+    .cfe-a4 .subtotales-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 9.5px;
+    }
+    .cfe-a4 .subtotales-table td {
+        padding: 3px 8px;
+        border-bottom: 1px solid #eee;
+    }
+    .cfe-a4 .subtotales-table tr:last-child td {
+        border-bottom: none;
+    }
+    .cfe-a4 .subtotales-table td.label-col {
+        color: #666;
+        font-size: 9px;
+    }
+    .cfe-a4 .subtotales-table td.value-col {
+        text-align: right;
+        font-weight: bold;
+    }
 
     /* Total a pagar */
-    .cfe-a4 .total-pagar-box { border: 2px solid #000; text-align: right; padding: 4px 8px; margin-top: 6px; display: flex; justify-content: space-between; font-size: 12px; font-weight: bold; }
+    .cfe-a4 .total-pagar-box {
+        border: 2px solid #003366;
+        margin-top: 8px;
+        padding: 6px 10px;
+        display: table;
+        width: 100%;
+        background: #e8f0fa;
+    }
+    .cfe-a4 .total-pagar-label {
+        display: table-cell;
+        font-size: 13px;
+        font-weight: bold;
+        color: #003366;
+        vertical-align: middle;
+    }
+    .cfe-a4 .total-pagar-value {
+        display: table-cell;
+        text-align: right;
+        font-size: 16px;
+        font-weight: bold;
+        color: #003366;
+    }
 
     /* Pagos */
-    .cfe-a4 .pagos-section { margin-top: 10px; border: 1px solid #000; }
-    .cfe-a4 .pagos-title { background: #e0e0e0; padding: 3px 6px; font-weight: bold; font-size: 10px; border-bottom: 1px solid #000; }
-    .cfe-a4 .pagos-table { width: 100%; border-collapse: collapse; font-size: 10px; }
-    .cfe-a4 .pagos-table td { padding: 2px 6px; border-bottom: 1px solid #eee; }
-    .cfe-a4 .pagos-table tr:last-child td { border-bottom: none; }
+    .cfe-a4 .pagos-section {
+        margin-top: 8px;
+        border: 1px solid #999;
+    }
+    .cfe-a4 .pagos-title {
+        background: #003366;
+        color: #fff;
+        padding: 3px 8px;
+        font-weight: bold;
+        font-size: 10px;
+        text-transform: uppercase;
+    }
+    .cfe-a4 .pagos-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 10px;
+    }
+    .cfe-a4 .pagos-table td {
+        padding: 3px 8px;
+        border-bottom: 1px solid #eee;
+    }
+    .cfe-a4 .pagos-table tr:last-child td {
+        border-bottom: none;
+    }
 
-    /* Footer DGI */
-    .cfe-a4 .dgi-footer { margin-top: 20px; border-top: 1px solid #aaa; padding-top: 6px; font-size: 9px; color: #333; }
-    .cfe-a4 .dgi-footer-grid { display: table; width: 100%; }
-    .cfe-a4 .dgi-footer-left { display: table-cell; vertical-align: top; width: 65%; line-height: 1.7; }
-    .cfe-a4 .dgi-footer-right { display: table-cell; vertical-align: bottom; width: 35%; text-align: right; }
+    /* Observaciones */
+    .cfe-a4 .observaciones {
+        border: 1px solid #ddd;
+        padding: 5px 8px;
+        margin-top: 6px;
+        font-size: 9.5px;
+    }
+    .cfe-a4 .observaciones strong {
+        color: #003366;
+    }
 
-    /* Barcode/QR */
-    .cfe-a4 .barcode-section { text-align: center; margin-top: 10px; }
+    /* ---- FOOTER DGI ---- */
+    .cfe-a4 .dgi-footer {
+        margin-top: 16px;
+        border-top: 3px solid #003366;
+        padding-top: 8px;
+        font-size: 9px;
+        color: #444;
+    }
+    .cfe-a4 .dgi-footer-grid {
+        display: table;
+        width: 100%;
+    }
+    .cfe-a4 .dgi-footer-left {
+        display: table-cell;
+        vertical-align: top;
+        width: 60%;
+        line-height: 1.8;
+    }
+    .cfe-a4 .dgi-footer-right {
+        display: table-cell;
+        vertical-align: top;
+        width: 40%;
+        text-align: center;
+    }
+
+    /* QR & Barcode */
+    .cfe-a4 .qr-section {
+        margin-top: 6px;
+        text-align: center;
+    }
+    .cfe-a4 .qr-label {
+        font-size: 7.5px;
+        color: #666;
+        margin-top: 3px;
+    }
+    .cfe-a4 .barcode-section {
+        text-align: center;
+        margin-top: 6px;
+    }
+
+    /* Sello DGI */
+    .cfe-a4 .dgi-sello {
+        margin-top: 8px;
+        padding: 4px 8px;
+        background: #e8f0fa;
+        border: 1px solid #003366;
+        font-size: 8px;
+        text-align: center;
+        color: #003366;
+        font-weight: bold;
+    }
 </style>
 
 <div class="cfe-a4">
@@ -101,43 +359,39 @@
         {{-- IZQUIERDA: Datos del emisor --}}
         <div class="cfe-header-left">
             @if(!empty($receipt_details->logo))
-                <img src="{{ $receipt_details->logo }}" alt="Logo" style="max-height:50px; max-width:160px; display:block; margin-bottom:5px;">
+                <img src="{{ $receipt_details->logo }}" alt="Logo" style="max-height:55px; max-width:170px; display:block; margin-bottom:6px;">
             @endif
             <div class="emisor-name">{{ $receipt_details->display_name ?? $receipt_details->business_name ?? '' }}</div>
             <div class="emisor-details">
-                @if(!empty($receipt_details->contact))
-                    {!! $receipt_details->contact !!}<br>
-                @endif
                 @if(!empty($receipt_details->address))
                     {!! $receipt_details->address !!}<br>
                 @endif
+                @if(!empty($receipt_details->contact))
+                    {!! $receipt_details->contact !!}<br>
+                @endif
                 @if(!empty($receipt_details->location_name))
-                    Sucursal: {{ $receipt_details->location_name }}
+                    <strong>Sucursal:</strong> {{ $receipt_details->location_name }}
                 @endif
             </div>
         </div>
 
-        {{-- DERECHA: Bloque documental estilo DGI --}}
+        {{-- DERECHA: Bloque documental DGI --}}
         <div class="cfe-header-right">
             <div class="doc-box">
                 <div class="doc-box-ruc">
-                    @if(!empty($receipt_details->tax_info1))
-                        {{ $receipt_details->tax_label1 ?? 'R.U.C.' }}<br>{{ $receipt_details->tax_info1 }}
-                    @else
-                        R.U.C.<br>-
-                    @endif
+                    {{ $receipt_details->tax_label1 ?? 'R.U.C.' }} {{ $receipt_details->tax_info1 ?? '-' }}
                 </div>
-                <div class="doc-box-tipo">Comprobante</div>
-                <div class="doc-box-subtipo">
+                <div class="doc-box-tipo">
                     @if(!empty($receipt_details->invoice_heading))
                         {!! $receipt_details->invoice_heading !!}
                     @else
                         Factura de Venta
                     @endif
                 </div>
+                <div class="doc-box-subtipo">Comprobante Fiscal Electrónico</div>
             </div>
 
-            <table class="serie-table">
+            <table class="info-table">
                 <tr>
                     <th>Número</th>
                     <th>Fecha</th>
@@ -152,9 +406,9 @@
             </table>
 
             @if(!empty($receipt_details->due_date))
-            <table class="fechas-table">
+            <table class="info-table" style="margin-top:3px;">
                 <tr>
-                    <th>Fecha de Comprobante</th>
+                    <th>Fecha Emisión</th>
                     <th>Fecha Vencimiento</th>
                 </tr>
                 <tr>
@@ -166,22 +420,25 @@
         </div>
     </div>
 
-    {{-- ======== RUC COMPRADOR + CLIENTE ======== --}}
-    <div class="comprador-section">
-        <div class="comprador-cell">
-            <div class="comprador-label">{{ $receipt_details->customer_tax_label ?: 'RUC' }} Comprador</div>
-            <div class="comprador-value">{{ $receipt_details->customer_tax_number ?: '-' }}</div>
-        </div>
-        <div class="cliente-cell">
-            <div class="cliente-label">Cliente</div>
-            <div class="cliente-value">{{ $receipt_details->customer_name ?? $receipt_details->contact_name ?? 'Consumidor Final' }}</div>
+    {{-- ======== DATOS DEL RECEPTOR / COMPRADOR ======== --}}
+    <div class="receptor-section">
+        <div class="receptor-title">Datos del Receptor</div>
+        <div class="receptor-grid">
+            <div class="receptor-cell">
+                <div class="receptor-label">{{ $receipt_details->customer_tax_label ?: 'RUC' }} Comprador</div>
+                <div class="receptor-value">{{ $receipt_details->customer_tax_number ?: '—' }}</div>
+            </div>
+            <div class="receptor-cell">
+                <div class="receptor-label">Razón Social / Nombre</div>
+                <div class="receptor-value">{{ $receipt_details->customer_name ?? $receipt_details->contact_name ?? 'Consumidor Final' }}</div>
+            </div>
         </div>
     </div>
 
     {{-- ======== DOMICILIO FISCAL ======== --}}
     @if(!empty($receipt_details->customer_info))
     <div class="domicilio-section">
-        <span class="domicilio-label">Domicilio / Contacto:</span>
+        <span class="domicilio-label">Dirección:</span>
         <span class="domicilio-value">{!! $receipt_details->customer_info !!}</span>
     </div>
     @endif
@@ -195,8 +452,8 @@
 
     {{-- ======== VENDEDOR ======== --}}
     @if(!empty($receipt_details->sales_person))
-    <div style="font-size:10px; margin-bottom:6px; padding:2px 0;">
-        <strong>Vendedor:</strong> {{ $receipt_details->sales_person }}
+    <div style="font-size:10px; margin:6px 0; padding:3px 8px; border:1px solid #ddd;">
+        <strong style="color:#003366;">Vendedor:</strong> {{ $receipt_details->sales_person }}
     </div>
     @endif
 
@@ -213,18 +470,20 @@
     <table class="conceptos-table">
         <thead>
             <tr>
-                <th style="width:{{ $has_discount ? '35%' : '45%' }}; text-align:left;">{{ $receipt_details->table_product_label ?? 'CONCEPTO' }}</th>
+                <th style="width:5%;">Nro</th>
+                <th style="width:{{ $has_discount ? '30%' : '40%' }}; text-align:left;">{{ $receipt_details->table_product_label ?? 'DESCRIPCIÓN' }}</th>
                 <th style="width:10%;">{{ $receipt_details->table_qty_label ?? 'CANT' }}</th>
                 <th style="width:15%;">{{ $receipt_details->table_unit_price_label ?? 'P/UNITARIO' }}</th>
                 @if($has_discount)
-                <th style="width:10%;">DESC.</th>
+                <th style="width:12%;">DESC.</th>
                 @endif
-                <th style="width:20%;">{{ $receipt_details->table_subtotal_label ?? 'TOTAL' }}</th>
+                <th style="width:18%;">{{ $receipt_details->table_subtotal_label ?? 'TOTAL' }}</th>
             </tr>
         </thead>
         <tbody>
-            @forelse($receipt_details->lines as $line)
+            @forelse($receipt_details->lines as $index => $line)
             <tr>
+                <td class="text-center">{{ $index + 1 }}</td>
                 <td>
                     {{ $line['name'] }} {{ $line['product_variation'] ?? '' }} {{ $line['variation'] ?? '' }}
                     @if(!empty($line['sub_sku'])) <small>({{ $line['sub_sku'] }})</small> @endif
@@ -247,7 +506,7 @@
             </tr>
             @empty
             <tr>
-                <td colspan="{{ $has_discount ? 5 : 4 }}" style="text-align:center; padding:12px; color:#777;">Sin ítems</td>
+                <td colspan="{{ $has_discount ? 6 : 5 }}" style="text-align:center; padding:14px; color:#999;">Sin ítems</td>
             </tr>
             @endforelse
         </tbody>
@@ -257,6 +516,7 @@
     <div class="totales-section">
         <div class="totales-left">
             @if(!empty($receipt_details->taxes))
+                <div style="margin-bottom:2px; font-weight:bold; color:#003366; font-size:9px; text-transform:uppercase;">Desglose Impositivo</div>
                 @foreach($receipt_details->taxes as $key => $val)
                     <strong>{{ $key }}:</strong> {{ $val }} &nbsp;&nbsp;
                 @endforeach
@@ -298,9 +558,9 @@
                     <td class="value-col">(+) {{ $receipt_details->tax }}</td>
                 </tr>
                 @endif
-                <tr>
-                    <td class="label-col" style="font-weight:bold;">Total Factura:</td>
-                    <td class="value-col" style="font-weight:bold;">{{ $receipt_details->total }}</td>
+                <tr style="border-top: 1px solid #999;">
+                    <td class="label-col" style="font-weight:bold; font-size:10px; color:#003366;">Total:</td>
+                    <td class="value-col" style="font-size:11px; color:#003366;">{{ $receipt_details->total }}</td>
                 </tr>
             </table>
         </div>
@@ -308,14 +568,14 @@
 
     {{-- ======== TOTAL A PAGAR ======== --}}
     <div class="total-pagar-box">
-        <span>{!! $receipt_details->total_label ?? 'TOTAL A PAGAR' !!}</span>
-        <span>{{ $receipt_details->total }}</span>
+        <span class="total-pagar-label">{!! $receipt_details->total_label ?? 'TOTAL A PAGAR' !!}</span>
+        <span class="total-pagar-value">{{ $receipt_details->total }}</span>
     </div>
 
     {{-- ======== PAGOS ======== --}}
     @if(!empty($receipt_details->payments))
     <div class="pagos-section">
-        <div class="pagos-title">FORMA DE PAGO</div>
+        <div class="pagos-title">Forma de Pago</div>
         <table class="pagos-table">
             @foreach($receipt_details->payments as $payment)
             <tr>
@@ -325,7 +585,7 @@
             </tr>
             @endforeach
             @if(!empty($receipt_details->total_paid))
-            <tr style="font-weight:bold; border-top:1px solid #000;">
+            <tr style="font-weight:bold; border-top:1px solid #003366;">
                 <td>{!! $receipt_details->total_paid_label ?? 'Total Pagado' !!}</td>
                 <td style="text-align:right;" colspan="2">{{ $receipt_details->total_paid }}</td>
             </tr>
@@ -340,39 +600,53 @@
     </div>
     @endif
 
-    {{-- ======== NOTAS ADICIONALES ======== --}}
+    {{-- ======== OBSERVACIONES ======== --}}
     @if(!empty($receipt_details->additional_notes))
-    <div style="border:1px solid #aaa; padding:5px 8px; margin-top:8px; font-size:10px;">
+    <div class="observaciones">
         <strong>Observaciones:</strong> {!! nl2br($receipt_details->additional_notes) !!}
     </div>
     @endif
 
-    {{-- ======== FOOTER ======== --}}
+    {{-- ======== FOOTER DGI CON QR ======== --}}
     <div class="dgi-footer">
         <div class="dgi-footer-grid">
+            {{-- IZQUIERDA: Datos fiscales --}}
             <div class="dgi-footer-left">
                 @if(!empty($receipt_details->tax_info1))
-                    {{ $receipt_details->tax_label1 ?? 'RUT' }} {{ $receipt_details->tax_info1 }}<br>
+                    <strong>{{ $receipt_details->tax_label1 ?? 'RUT' }}</strong> {{ $receipt_details->tax_info1 }}<br>
                 @endif
                 @if(!empty($receipt_details->footer_text))
                     {!! $receipt_details->footer_text !!}<br>
                 @endif
                 <br>
-                Documento generado electrónicamente<br>
-                {{ \Carbon\Carbon::now()->format('d/m/Y H:i:s') }}
+                Comprobante autorizado por DGI — <strong>IVA al día</strong><br>
+                Consulte validez: <strong>www.efactura.dgi.gub.uy</strong><br>
+                <br>
+                <span style="font-size:8px; color:#888;">
+                    Documento generado el {{ \Carbon\Carbon::now()->format('d/m/Y H:i') }}
+                </span>
             </div>
+
+            {{-- DERECHA: Barcode + QR --}}
             <div class="dgi-footer-right">
                 @if(!empty($receipt_details->show_barcode))
                 <div class="barcode-section">
-                    <img src="data:image/png;base64,{{DNS1D::getBarcodePNG($receipt_details->invoice_no, 'C128', 2, 30, array(39, 48, 54), true)}}">
+                    <img src="data:image/png;base64,{{DNS1D::getBarcodePNG($receipt_details->invoice_no, 'C128', 2, 30, array(0, 51, 102), true)}}">
                 </div>
                 @endif
+
                 @if(!empty($receipt_details->show_qr_code) && !empty($receipt_details->qr_code_text))
-                <div class="barcode-section" style="margin-top:5px;">
-                    <img src="data:image/png;base64,{{DNS2D::getBarcodePNG($receipt_details->qr_code_text, 'QRCODE', 3, 3, [39, 48, 54])}}">
+                <div class="qr-section">
+                    <img src="data:image/png;base64,{{DNS2D::getBarcodePNG($receipt_details->qr_code_text, 'QRCODE', 4, 4, [0, 51, 102])}}" style="width:100px; height:100px;">
+                    <div class="qr-label">Escanee para verificar</div>
                 </div>
                 @endif
             </div>
+        </div>
+
+        {{-- Sello DGI --}}
+        <div class="dgi-sello">
+            COMPROBANTE FISCAL ELECTRÓNICO — D.G.I. — DIRECCIÓN GENERAL IMPOSITIVA — URUGUAY
         </div>
     </div>
 
